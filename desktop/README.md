@@ -27,6 +27,10 @@ The optional voice frontend uses OpenAI Live. Routine actions call local tools;
 the Codex app-server coordinator handles broader orchestration with the user's
 configured model. Larger execution tasks go to visible worker terminals. The
 provider's native conversation ID is recorded when available for later resume.
+Codex discovery checks both local and UTC date folders, keeps waiting through
+delayed first prompts, and reads bounded metadata records larger than one small
+buffer. Closing or resuming a tab can recover a missing ID from its exact Mr. Mak
+origin marker. Shared working directories alone are not proof of ownership.
 
 New Codex and Claude chats default to `xhigh`; explicit saved effort choices are
 preserved. Terminal URLs and OSC 8 links use xterm link handlers. New-window

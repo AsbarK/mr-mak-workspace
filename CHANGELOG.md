@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.14 - 2026-09-30
+
+- Added six reusable agent workflows: game VFX, game UI, animation integration,
+  level design, game audio and native visual review. Both Codex and Claude get
+  complete project-local skills with the same resources.
+- Improved Blender animation, motion references, feature handoffs and production
+  routing. Added a separate skills ZIP with the supporting files and licences.
+- Fixed Codex History recovery across local midnight and UTC date boundaries.
+  Conversations with large metadata or a delayed first prompt can be discovered.
+  Recovery checks the original conversation's identity rather than guessing from
+  a shared project folder.
+
+This release aligns the public and desktop version numbers at 0.4.14; it follows
+public 0.1.2. Previous public releases remain available.
+
+**Update:** quit the app after active tasks finish, then install the Windows
+update and open your existing repository. New skills are repository content;
+merge them separately or use the skills ZIP. See [the update guide](docs/updating.md).
+
 ## 0.1.2 - 2026-09-23
 
 - Fixed mouse-wheel scrolling in fullscreen Claude Code chats after opening a tab or returning to it. Scrolling also survives reconnects.

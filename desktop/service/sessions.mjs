@@ -1,14 +1,14 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { mkdir, stat, readdir } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
 import pty from 'node-pty';
 import headless from '@xterm/headless';
 import { TerminalSnapshotAddon } from './terminal-snapshot.mjs';
 import { terminalCommand, childEnvironment } from './agents.mjs';
 import { readJson, saveJson } from './util.mjs';
 import { claudeTranscript, codexTranscript, tailNativeFile } from './native-events.mjs';
+import { findCodexChat } from './codex-history.mjs';
 import { englishTitle, restoredTitle } from './titles.mjs';
 import { defaultWorkerEffort, workerEfforts } from './effort.mjs';
 
@@ -207,38 +207,28 @@ export class Sessions extends EventEmitter {
 
   async discoverNative(session) {
     if (session.agent !== 'codex' || session.nativeId) return;
-    const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
-    const date = new Date().toISOString().slice(0, 10).split('-');
-    const folder = path.join(home, 'sessions', ...date);
-    const { open } = await import('node:fs/promises');
-    for (let attempt = 0; attempt < 60 && session.process; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const matches = [];
-      for (const entry of await readdir(folder, { withFileTypes: true }).catch(() => [])) {
-        if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
-        const file = path.join(folder, entry.name);
-        const info = await stat(file);
-        if (info.birthtimeMs < session.startedAt - 1000) continue;
-        const handle = await open(file, 'r');
-        try {
-          const buffer = Buffer.alloc(32768);
-          const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-          const first = JSON.parse(buffer.subarray(0, bytesRead).toString().split('\n')[0]);
-          if (first.type === 'session_meta' && first.payload?.cwd?.toLowerCase() === session.cwd.toLowerCase() && first.payload?.source === 'cli') matches.push({ id: first.payload.id, file, owned: first.payload.originator === `mrmak_chat_${session.id}` });
-        } catch { /* A partial record will be retried. */ } finally { await handle.close(); }
-      }
-      const peers = [...this.items.values()].filter(item => item !== session && item.agent === 'codex' && item.cwd === session.cwd && !item.nativeId && item.process);
-      const claimed = new Set([...this.items.values()].map(item => item.nativeId));
-      const candidates = matches.filter(item => !claimed.has(item.id));
-      const owned = candidates.filter(item => item.owned);
-      const match = owned.length === 1 ? owned[0] : candidates.length === 1 && !peers.length ? candidates[0] : null;
-      if (match) {
-        session.nativeId = match.id;
-        this.changed(session);
-        this.watchNative(session, match.file);
-        return;
-      }
+    const process = session.process;
+    for (let attempt = 0; !this.closed && process && session.process === process && !session.nativeId; attempt++) {
+      const match = await findCodexChat(session);
+      if (this.closed || session.process !== process || session.nativeId) return;
+      if (this.bindNative(session, match)) { this.watchNative(session, match.file); return; }
+      // A first prompt, login or CLI update can take longer than thirty seconds.
+      await new Promise(resolve => { const timer = setTimeout(resolve, attempt < 60 ? 500 : 3000); timer.unref(); });
     }
+  }
+
+  bindNative(session, match) {
+    if (!match || session.nativeId || [...this.items.values()].some(item => item !== session && item.nativeId === match.id)) return false;
+    session.nativeId = match.id;
+    session.hasConversation = true;
+    session.restoreError = null;
+    this.changed(session);
+    return true;
+  }
+
+  async recoverNative(session) {
+    if (session.agent !== 'codex' || session.nativeId) return;
+    this.bindNative(session, await findCodexChat(session, { full: true }));
   }
 
   flushOutput(session) {
@@ -370,6 +360,7 @@ export class Sessions extends EventEmitter {
     if (session.process) return publicSession(session);
     if (!session.open && this.active().length >= 80) throw new Error('Close a tab before opening another.');
     await this.hydrate(session);
+    if (!nativeId) await this.recoverNative(session);
     let resumeId = nativeId || session.nativeId;
     // A terminal closed before its first prompt may have no native conversation yet.
     if (session.agent === 'claude' && resumeId && !nativeId && !(await stat(await claudeTranscript(session.cwd, resumeId)).catch(() => null))) resumeId = null;
@@ -387,6 +378,8 @@ export class Sessions extends EventEmitter {
   }
   async remove(id) {
     const session = this.get(id);
+    // Capture an ID even if the user closes before background discovery runs.
+    await this.recoverNative(session);
     session.open = false; session.updatedAt = new Date().toISOString();
     if (session.process && !session.stopping) {
       const proc = session.process;

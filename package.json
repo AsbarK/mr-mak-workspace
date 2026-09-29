@@ -1,7 +1,7 @@
 {
   "name": "mr-mak-workspace",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.4.14",
   "type": "module",
   "scripts": {
     "predev": "node scripts/ensure-workspace-link.mjs",
@@ -14,10 +14,11 @@
     "desktop:build": "tauri build",
     "desktop:dev": "tauri dev",
     "desktop:test": "node --test desktop/service/test/*.test.mjs",
-    "desktop:test:ui": "node desktop/service/test/ui.mjs && node desktop/service/test/links-ui.mjs && node desktop/service/test/scroll-ui.mjs",
+    "desktop:test:ui": "node desktop/service/test/ui.mjs && node desktop/service/test/links-ui.mjs && node desktop/service/test/scroll-ui.mjs && node desktop/service/test/history-ui.mjs",
     "test": "npm run desktop:test",
     "test:template": "node scripts/check-template.mjs && node scripts/sync-skills.mjs --check",
-    "skills:sync": "node scripts/sync-skills.mjs"
+    "skills:sync": "node scripts/sync-skills.mjs",
+    "skills:pack": "python scripts/package_skills.py"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

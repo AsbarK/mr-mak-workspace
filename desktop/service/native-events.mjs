@@ -70,27 +70,4 @@ export async function claudeTranscript(cwd, nativeId) {
   return path.join(root, folder, `${nativeId}.jsonl`);
 }
 
-export async function codexTranscript(nativeId) {
-  if (!/^[a-f0-9-]{36}$/i.test(nativeId)) return null;
-  const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
-  const pending = [path.join(home, 'sessions')];
-  const matches = [];
-  while (pending.length) {
-    const folder = pending.pop();
-    for (const entry of await readdir(folder, { withFileTypes: true }).catch(() => [])) {
-      const file = path.join(folder, entry.name);
-      if (entry.isDirectory()) pending.push(file);
-      else if (entry.isFile() && entry.name.toLowerCase().endsWith(`-${nativeId.toLowerCase()}.jsonl`)) {
-        const handle = await open(file, 'r');
-        try {
-          const buffer = Buffer.alloc(32768);
-          const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-          const first = JSON.parse(buffer.subarray(0, bytesRead).toString('utf8').split('\n')[0]);
-          if (first.type === 'session_meta' && first.payload?.id === nativeId) matches.push(file);
-        } catch { /* A matching name alone is not proof of the native session. */ }
-        finally { await handle.close(); }
-      }
-    }
-  }
-  return matches.length === 1 ? matches[0] : null;
-}
+export { codexTranscript } from './codex-history.mjs';

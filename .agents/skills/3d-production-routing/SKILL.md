@@ -1,6 +1,6 @@
 ---
 name: 3d-production-routing
-description: Choose a practical workflow for 3D concepts, generated meshes, material maps, procedural Three.js reconstruction and game animation.
+description: Choose a workflow for 3D concepts, meshes, materials, animation, game VFX, UI, levels, audio and native visual review.
 ---
 
 # Route 3D production
@@ -19,6 +19,12 @@ Inspect the supplied assets and the target engine before selecting a route.
 | Validate and deliver a PBR material | `materials-to-game` |
 | Analyze motion timing | `motion-reference-workflow` or `video-watch` |
 | Rig, skin, animate and export in Blender | `blender-game-animation` |
+| Integrate clips and locomotion transitions in an engine | `game-animation-integration` |
+| Plan and implement event-driven visual effects | `game-vfx-workflow` |
+| Develop a HUD or menu from concept through live game state | `game-ui-workflow` |
+| Design and validate a playable level | `game-level-design` |
+| Select and integrate game sounds | `game-audio-workflow` |
+| Verify the result in the actual game | `gameplay-visual-review` |
 
 Read the selected skill before execution. Its presence does not mean its MCP,
 CLI, account or editor is connected. Inspect live capabilities and exact model

@@ -147,7 +147,7 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
     try {
       const url = new URL(request.url, origin);
       if (request.headers.host !== new URL(origin).host) throw Object.assign(new Error('Unexpected host'), { status: 403 });
-      if (url.pathname === '/health') return json(response, 200, { service: 'mrmak', version: '0.1.2' });
+      if (url.pathname === '/health') return json(response, 200, { service: 'mrmak', version: '0.4.14' });
       if (url.pathname.startsWith('/api/')) {
         authorize(request);
         const method = request.method;

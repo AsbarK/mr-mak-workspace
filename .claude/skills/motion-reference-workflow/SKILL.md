@@ -30,6 +30,14 @@ not recreate the action from text. Check the transferred limbs and contacts.
 Generated human-looking footage is not itself captured skeleton data. A later
 mocap extraction and its quality checks remain separate work.
 
+Keep a small take ledger: source, prompt or edit intent, provider/model, local
+result, observed problems and decision. Distinguish generated, reviewed,
+selected and approved. Carry the selected take's identity into the animation
+handoff. For a creature-to-human transfer, verify which limb represents each
+contact and reject anatomy changes that destroy the original action. Preserve
+the original and any timed trim; do not replace a motion reference with a new
+performance merely because its appearance is cleaner.
+
 Example: a two-second robot walk loop with fixed camera and readable foot
 contacts. A successful clip must loop cleanly and retain the approved robot;
 remote completion alone does not establish those properties.

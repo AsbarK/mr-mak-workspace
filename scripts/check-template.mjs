@@ -40,7 +40,10 @@ for (const entity of entities) {
 assert.equal(arachneImages.size, 158, 'All Arachne images must be reachable from the tabs.');
 assert.equal(videos.size, 8, 'Keep all eight motion studies.');
 const skillNames = (await readdir(path.join(root, '.agents/skills'), { withFileTypes: true })).filter(e => e.isDirectory()).map(e => e.name);
-assert.equal(skillNames.length, 14);
+assert.equal(skillNames.length, 20);
+for (const name of ['game-vfx-workflow', 'game-ui-workflow', 'game-animation-integration', 'game-level-design', 'game-audio-workflow', 'gameplay-visual-review']) {
+  assert.ok(skillNames.includes(name), `Missing game production workflow: ${name}`);
+}
 for (const name of skillNames) {
   const skill = await read(`.agents/skills/${name}/SKILL.md`);
   assert.match(skill, /^---\r?\nname:/);
@@ -52,6 +55,8 @@ assert.deepEqual(JSON.parse(await read('.mcp.json')), { mcpServers: {} });
 assert.doesNotMatch(await read('.env.example'), /^\w+=(?!\s*$)\S+/m, 'The example env must contain no assigned values.');
 assert.match(await read('src/desktop/client.ts'), /defaultBypass: false/);
 assert.match(await read('desktop/service/server.mjs'), /defaultBypass: false/);
+assert.match(await read('desktop/service/sessions.mjs'), /bypass: options\.bypass === true/);
+assert.match(await read('desktop/service/sessions.mjs'), /pinned = false, bypass = false/);
 const readme = await read('README.md');
 assert.match(readme, /Mr\. Mak is small\.\s+<img src="docs\/assets\/mr-mak\.png"[^>]+>\s*$/);
 await stat(path.join(root, 'docs/assets/mr-mak.png'));

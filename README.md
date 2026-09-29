@@ -65,9 +65,10 @@ your own agent accounts and any services you want to use.
 The installer includes the local Node service. It does not include Codex,
 Claude Code, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.1.2 update notes](CHANGELOG.md) for the Claude
-scrolling fix and earlier terminal improvements. Install the update
-after quitting the app from its tray menu, then open your existing repository.
+**Already using Mr. Mak?** Read the [0.4.14 update notes](CHANGELOG.md) for Codex
+history recovery and six new game-production skills. Follow the
+[update guide](docs/updating.md) to update the app and add skills to your existing
+repository without replacing your projects.
 
 To build from source, install Node.js 22.20+ and the Windows Tauri build
 prerequisites, then run:
@@ -103,10 +104,13 @@ Claude chats start with `xhigh` effort; saved effort choices are preserved.
 
 ## Skills you can keep
 
-Fourteen project skills cover planning, handoffs, Workspace reports, image
+Twenty project skills cover planning, handoffs, Workspace reports, image
 references, fal.ai generation, Higgsfield workflows, character sheets, procedural
 Three.js modeling, materials, motion references, Blender game animation, video
-inspection and dictation setup. Read the [skill index](docs/skills.md).
+inspection and dictation setup. Game workflows cover **VFX, UI, animation
+integration, level design, audio and native visual review**. Read the
+[skill index](docs/skills.md), or take the separate skills ZIP from the release
+into another project.
 
 The maintained instructions live in `.agents/skills`. Complete copies in
 `.claude/skills` include the same instructions and resources. Both agents get the

@@ -18,3 +18,10 @@ Present selected and rejected takes in the task's Workspace card with clear
 labels and usable media previews. Retain enough prompt and version information
 to reproduce the work, while excluding tokens and signed provider links from
 public exports. End with a precise next step or the verified final artifact.
+
+For game work, continue into the relevant production skill: VFX, UI, animation
+integration, level design or game audio. Carry the accepted concept and real
+gameplay event markers into the implementation. Keep proposals, implemented
+behavior, agent verification and user acceptance distinct. Use
+`gameplay-visual-review` for evidence from the actual engine; a browser study or
+generated clip cannot establish that an effect works in the game.

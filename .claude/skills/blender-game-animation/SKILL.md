@@ -9,6 +9,9 @@ Build an editable animation project from the supplied mesh and references.
 Inspect existing work before changing it. Establish anatomy, skeleton needs,
 forward axis, units, frame rate, clips, loop/root-motion behavior and gameplay
 events from the task. Do not regenerate a supplied model as an incidental step.
+When continuing another artist's file, inventory the rigs, Actions, slots,
+constraints, reference media and export settings before editing. Keep a source
+copy and distinguish approved clips from experiments.
 
 ## Rig and skin
 
@@ -42,6 +45,12 @@ in time when converting a clip. Keep a source action when making a compact game
 variant. Each action needs explicit range and fps metadata. Check scene range,
 preview range and NLA settings separately. Test action switching and ordinary
 Play after saving and reopening; review scenes do not replace this check.
+Bind the intended Action and its compatible slot explicitly. If several rigs
+share a scene, playback range ownership must include the rig, Action, slot and
+clip metadata, not just an Action name. Returning from an effect rig to a
+character must restore the character's range. Suspend automatic range changes
+while the user is posing. Save a readable textured viewport and verify it after
+reopening; a render alone does not establish a usable authoring file.
 
 ## Bake and hand off
 
@@ -55,6 +64,8 @@ textures, duration and sampled poses in a common coordinate system. Account for
 UV/normal seam duplicates when comparing geometry. A raw vertex-index comparison
 can be misleading after a valid export. Check permanent mesh edits across every
 affected action, not just a single pose.
+Read [export and integration checks](references/engine-handoff.md) for separate
+model/clip files, bind-basis failures and turn-to-locomotion handoff.
 
 Deliver editable source, runtime export, source references, review evidence and
 a short engine guide. Distinguish source approval, export verification and actual
