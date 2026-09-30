@@ -7,7 +7,7 @@ context, credentials or agent conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.4.14** for Windows x64.
+2. Install **Mr. Mak Workspace 0.4.15** for Windows x64.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
@@ -18,6 +18,10 @@ New chat > Resume with a known native ID when importing an existing CLI chat.
 Saved terminal screens are retained when automatic recovery is not possible.
 
 ## Skills and source
+
+For a browser-only preview, merge the source fixes, run `npm ci`, and restart
+Vite. Version 0.4.15 fixes Markdown card links and images that could leave the
+browser view blank. Root `npm ci` also installs the local service dependencies.
 
 An installer alone cannot add the new skills. For a clone that tracks this
 repository, ask your agent to review and merge the release's source changes.

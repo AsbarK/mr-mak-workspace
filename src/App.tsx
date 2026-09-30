@@ -6,6 +6,7 @@ import MakLogo from './components/MakLogo'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import HomeGrid from './components/HomeGrid'
+import ReportBoundary from './components/ReportBoundary'
 import { contentUrl, isDesktop } from './desktop/client'
 
 const Compare3D = lazy(() => import('./components/Compare3D'))
@@ -161,6 +162,7 @@ export default function App() {
         />
 
         <div className="content">
+          <ReportBoundary key={reportUrl || 'home'} onHome={goHome}>
           {entity && reportUrl && step?.viewer === 'compare3d' ? (
             <Suspense fallback={<div className="boot"><MakLogo size={56} animated={false} /></div>}><Compare3D
               key={reportUrl}
@@ -179,6 +181,7 @@ export default function App() {
               query={query}
             />
           )}
+          </ReportBoundary>
         </div>
       </main>
     </div>

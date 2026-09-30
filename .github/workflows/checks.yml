@@ -14,11 +14,11 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm --prefix desktop/service ci
       - run: npm run lint
       - run: npm test
       - run: npm run test:template
       - run: npm run build
+      - run: npm run test:preview
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

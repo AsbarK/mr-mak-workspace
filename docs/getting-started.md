@@ -82,6 +82,11 @@ terminals is described in [voice dictation](../knowledge/voice-dictation.md).
 
 ## Build from source
 
+From a fresh clone, `npm ci` installs both the frontend and local desktop
+service dependencies. Then `npm test` runs the service checks; no separate
+service install is needed. If you disable npm lifecycle scripts, run
+`npm --prefix desktop/service ci` explicitly before tests or the service.
+
 Install [Node.js](https://nodejs.org/en/download), Rust's MSVC toolchain and
 [Tauri's Windows prerequisites](https://v2.tauri.app/start/prerequisites/#windows):
 Microsoft C++ Build Tools and WebView2. Node.js 22.20+ is required by this template.

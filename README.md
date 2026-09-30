@@ -65,8 +65,8 @@ your own agent accounts and any services you want to use.
 The installer includes the local Node service. It does not include Codex,
 Claude Code, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.4.14 update notes](CHANGELOG.md) for Codex
-history recovery and six new game-production skills. Follow the
+**Already using Mr. Mak?** Read the [0.4.15 update notes](CHANGELOG.md) for browser
+preview, source setup and local service security improvements. Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.
 

@@ -1,9 +1,10 @@
 {
   "name": "mr-mak-workspace",
   "private": true,
-  "version": "0.4.14",
+  "version": "0.4.15",
   "type": "module",
   "scripts": {
+    "postinstall": "npm --prefix desktop/service ci",
     "predev": "node scripts/ensure-workspace-link.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -16,6 +17,7 @@
     "desktop:test": "node --test desktop/service/test/*.test.mjs",
     "desktop:test:ui": "node desktop/service/test/ui.mjs && node desktop/service/test/links-ui.mjs && node desktop/service/test/scroll-ui.mjs && node desktop/service/test/history-ui.mjs",
     "test": "npm run desktop:test",
+    "test:preview": "node scripts/check-preview-ui.mjs",
     "test:template": "node scripts/check-template.mjs && node scripts/sync-skills.mjs --check",
     "skills:sync": "node scripts/sync-skills.mjs",
     "skills:pack": "python scripts/package_skills.py"

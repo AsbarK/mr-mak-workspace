@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.15 - 2026-09-30
+
+- Fixed browser preview crashing on Markdown cards with links or images. Local
+  document paths now resolve against the browser origin. A report error also
+  leaves Workspace navigation available, with a reload option.
+- Root `npm ci` now installs the local service dependencies too, so tests and
+  source-based service startup work without an extra install command.
+- Removed window authentication credentials from runtime diagnostics. Startup
+  passes them directly to the desktop shell without saving them in the project.
+- Updated the service's `fast-uri` dependency to 3.1.8, addressing
+  [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj).
+- Added browser preview regression checks and a private security reporting guide.
+
+**Update:** finish active tasks, quit Mr. Mak, then install the Windows update.
+For browser preview, merge the source update, run `npm ci`, then restart Vite.
+The skills pack from 0.4.14 is unchanged. The separate report in issue #5 remains
+open while we await its private reproduction details; this release does not
+claim to resolve that report.
+
 ## 0.4.14 - 2026-09-30
 
 - Added six reusable agent workflows: game VFX, game UI, animation integration,

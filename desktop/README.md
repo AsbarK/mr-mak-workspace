@@ -46,13 +46,17 @@ Claude and Codex continue using local terminal scrollback.
 
 ```powershell
 npm ci
-npm --prefix desktop/service ci
 npm run lint
 npm test
 npm run test:template
 npm run build
 npm run desktop:test:ui
+npm run test:preview
 ```
+
+The root install also installs the locked `desktop/service` dependencies. If
+you deliberately use `npm ci --ignore-scripts`, run
+`npm --prefix desktop/service ci` before tests or the local service.
 
 UI tests use an isolated repository and fake terminals. Edge must be available
 on Windows, or set `MRMAK_TEST_BROWSER` to a Playwright browser channel you have

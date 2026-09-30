@@ -12,7 +12,9 @@ const uiDir = path.resolve(option('--ui') || path.join(directory, '../../dist'))
 const stateDir = path.resolve(option('--state') || path.join(repo, '.mrmak'));
 const writeNative = value => process.stdout.write(JSON.stringify(value) + '\n');
 const service = await createService({ repo, uiDir, stateDir, native: writeNative, restoreSessions: true });
-await saveJson(path.join(stateDir, 'runtime.json'), { pid: process.pid, origin: service.origin, token: service.token, urls: service.urls });
+// Diagnostics are readable project state. Window credentials travel only over
+// the private startup pipe to the desktop shell, never through this file.
+await saveJson(path.join(stateDir, 'runtime.json'), { pid: process.pid, origin: service.origin });
 writeNative({ type: 'ready', ...service.urls });
 let exiting = false;
 async function stop() {
