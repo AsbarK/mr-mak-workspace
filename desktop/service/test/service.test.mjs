@@ -62,7 +62,7 @@ test('local authorization and report isolation protect the terminal service', as
   } finally { await service.close(); }
 });
 
-test('real ConPTY supports Unicode, reconnect snapshots, resizing, exit and saved history', { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+test('real PTY supports Unicode, reconnect snapshots, resizing, exit and saved history', { timeout: 30000 }, async () => {
   const { service, request, repo } = await fixture();
   let ws;
   try {
@@ -145,7 +145,7 @@ test('completion notifications require a native final-turn event', async () => {
   } finally { stop(); await service.close(); }
 });
 
-test('History preserves closed and pinned chats while startup restores only open tabs', { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+test('History preserves closed and pinned chats while startup restores only open tabs', { timeout: 30000 }, async () => {
   const { service, repo, request } = await fixture();
   let reopened;
   try {
@@ -180,7 +180,7 @@ test('History preserves closed and pinned chats while startup restores only open
   } finally { await reopened?.close(); await service.close(); }
 });
 
-test('pasted images are saved in inbox and inserted as a quoted path without submitting', { skip: process.platform !== 'win32', timeout: 20000 }, async () => {
+test('pasted images are saved in inbox and inserted as a quoted path without submitting', { timeout: 20000 }, async () => {
   const { service, repo } = await fixture();
   try {
     const image = await readFile(path.join(root, 'src-tauri', 'icons', '32x32.png'));

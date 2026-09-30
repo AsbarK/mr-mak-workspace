@@ -135,11 +135,11 @@ try {
     } else {
       await page.locator('.xterm-helper-textarea').focus(); await page.keyboard.press('Control+c');
       for (let i = 0; i < 20 && !writes.get(agent).includes('\x03'); i++) await new Promise(resolve => setTimeout(resolve, 20));
-      assert.ok(writes.get(agent).includes('\x03'), 'PowerShell retains Ctrl+C interrupt');
+      assert.ok(writes.get(agent).includes('\x03'), 'The local shell retains Ctrl+C interrupt');
     }
   }
   assert.deepEqual(errors, []);
-  console.log('UI passed: 12 clickable wrapping tabs; Markdown preview/edit/save/conflict/draft; local Skills; MCP filtering, checks and hidden credentials; terminal bottom row visible across four window/font sizes; Codex/Claude/Kimi copy and scroll; PowerShell interrupt.');
+  console.log('UI passed: 12 clickable wrapping tabs; Markdown preview/edit/save/conflict/draft; local Skills; MCP filtering, checks and hidden credentials; terminal bottom row visible across four window/font sizes; Codex/Claude/Kimi copy and scroll; local shell interrupt.');
 } finally {
   await browser?.close();
   for (const session of service.sessions.items.values()) session.process = null;

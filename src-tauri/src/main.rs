@@ -196,12 +196,11 @@ fn main() {
             #[cfg(windows)]
             window_identity::initialize(app.handle())?;
             let repo = repo_path(app.handle())?;
-            // WebView/Tauri canonical paths can carry the Windows extended-path
-            // prefix. Node's entrypoint resolver needs a normal drive path.
             let resource_dir = app.path().resource_dir()?;
-            let runtime = PathBuf::from(resource_dir.to_string_lossy().trim_start_matches(r"\\?\")).join("runtime");
-            let (node, script, ui) = if runtime.join("node.exe").is_file() {
-                (runtime.join("node.exe"), runtime.join("service/main.mjs"), runtime.join("ui"))
+            let runtime = resource_dir.join("runtime");
+            let runtime_node = if cfg!(windows) { runtime.join("node.exe") } else { runtime.join("node") };
+            let (node, script, ui) = if runtime_node.is_file() {
+                (runtime_node, runtime.join("service/main.mjs"), runtime.join("ui"))
             } else {
                 (PathBuf::from("node"), repo.join("desktop/service/main.mjs"), repo.join("dist"))
             };
@@ -252,7 +251,6 @@ fn main() {
                                 }
                             }
                         },
-                        #[cfg(windows)]
                         "recycle-file" => {
                             if let Some(file) = event["path"].as_str() {
                                 if let Some(window) = app_handle.get_webview_window("workspace") {
@@ -284,13 +282,7 @@ fn main() {
                                 });
                             }
                         },
-                        "reveal" => {
-                            if let Some(file) = event["path"].as_str() {
-                                let mut command = Command::new("explorer.exe");
-                                if PathBuf::from(file).is_dir() { command.arg(file); } else { command.arg(format!("/select,{}", file)); }
-                                let _ = hidden(&mut command).spawn();
-                            }
-                        },
+                        "reveal" => { if let Some(file) = event["path"].as_str() { let _ = external_links::reveal_path(file); } },
                         _ => {}
                     }
                 }
