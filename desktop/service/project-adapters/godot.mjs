@@ -66,7 +66,7 @@ export const godotProjectAdapter = {
           if (entry.name === '.git' || entry.name === '.godot' || entry.name === 'node_modules') continue;
           const full = path.join(folder, entry.name);
           if (entry.isDirectory()) await visit(full, depth + 1);
-          else if (/\.(godot|tscn|scn|gd|gdshader|tres|res|png|jpg|jpeg|webp|glb|gltf)$/i.test(entry.name) || entry.name === 'README.md') result.push({ path: full, kind: path.extname(entry.name).slice(1) || 'file', label: path.relative(project.root, full) });
+          else if (/\.(godot|tscn|scn|gd|gdshader|tres|res|png|jpg|jpeg|webp|glb|gltf)$/i.test(entry.name) || entry.name === 'README.md') result.push({ path: full, kind: path.extname(entry.name).slice(1) || 'file', label: path.relative(project.root, full).split(path.sep).join('/') });
         }
       };
       await visit(project.root);

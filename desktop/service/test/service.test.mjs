@@ -78,9 +78,13 @@ test('real PTY supports Unicode, reconnect snapshots, resizing, exit and saved h
     await until(() => messages.some(item => item.type === 'connected'));
     ws.send(JSON.stringify({ type: 'subscribe', id: session.id }));
     await until(() => messages.some(item => item.type === 'snapshot'));
+    await terminalReady(service, session.id);
     ws.send(JSON.stringify({ type: 'resize', id: session.id, cols: 74, rows: 22 }));
     await sleep(400);
-    ws.send(JSON.stringify({ type: 'input', id: session.id, data: "[Console]::OutputEncoding = [Text.UTF8Encoding]::new(); Write-Output ('UNICODE-' + [char]0x041F + [char]0x0440 + [char]0x0438 + [char]0x0432 + [char]0x0435 + [char]0x0442)\r" }));
+    const unicodeCommand = process.platform === 'win32'
+      ? "[Console]::OutputEncoding = [Text.UTF8Encoding]::new(); Write-Output ('UNICODE-' + [char]0x041F + [char]0x0440 + [char]0x0438 + [char]0x0432 + [char]0x0435 + [char]0x0442)\r"
+      : "printf 'UNICODE-Привет\\n'\r";
+    ws.send(JSON.stringify({ type: 'input', id: session.id, data: unicodeCommand }));
     await until(async () => (await service.sessions.read(session.id)).screen.includes('UNICODE-Привет'));
     const snapshot = await service.sessions.snapshot(session.id);
     assert.equal(snapshot.session.cols, 74); assert.equal(snapshot.session.rows, 22);
@@ -156,8 +160,8 @@ test('History preserves closed and pinned chats while startup restores only open
     assert.equal(restoredTab.open, true);
     await service.sessions.remove(archived.id);
     const active = await service.sessions.create({ agent: 'shell', name: 'Current task', cwd: repo });
-    await sleep(450);
-    service.sessions.input(active.id, "Write-Output ('RESTORE_' + 'CONTEXT_OK')\r");
+    await terminalReady(service, active.id);
+    service.sessions.input(active.id, process.platform === 'win32' ? "Write-Output ('RESTORE_' + 'CONTEXT_OK')\r" : "printf 'RESTORE_CONTEXT_OK\\n'\r");
     await until(async () => (await service.sessions.read(active.id)).screen.includes('RESTORE_CONTEXT_OK'));
     const history = await (await request('/history')).json();
     assert.equal(history[0].id, archived.id);
@@ -196,7 +200,7 @@ test('pasted images are saved in inbox and inserted as a quoted path without sub
     const unauthenticated = await fetch(service.origin + '/api/attachments', { method: 'POST', body: image });
     assert.equal(unauthenticated.status, 401);
     const shell = await service.sessions.create({ agent: 'shell', name: 'Attachment input', cwd: repo });
-    await sleep(450);
+    await terminalReady(service, shell.id);
     const attached = await fetch(service.origin + `/api/sessions/${shell.id}/attach`, { method: 'POST', headers: { Authorization: `Bearer ${service.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: [saved.path] }) });
     assert.equal(attached.status, 200);
     assert.equal((await attached.json()).submitted, false);
@@ -223,4 +227,12 @@ async function until(predicate, timeout = 12000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) { if (await predicate()) return; await sleep(80); }
   throw new Error('Expected terminal state did not arrive before the deadline');
+}
+
+async function terminalReady(service, id) {
+  await until(async () => {
+    const session = service.sessions.get(id);
+    if (session.status !== 'running') return false;
+    return Boolean((await service.sessions.read(id)).screen);
+  });
 }
