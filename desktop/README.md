@@ -44,6 +44,24 @@ both mouse tracking and the requested SGR encoding, including saved screens,
 so switching tabs or reconnecting does not disable its mouse wheel. Classic
 Claude and Codex continue using local terminal scrollback.
 
+## OpenCode terminals
+
+The service detects installed OpenCode 1.x or 2.x and launches its real TUI.
+OpenCode owns model choice, provider authentication and reasoning configuration.
+The optional `--auto` flag keeps OpenCode's explicit permission denials intact.
+
+`desktop/service/opencode/` contains dependency-free event observers for both
+plugin APIs. A per-process inline configuration adds the matching observer while
+preserving configured plugins, models and providers. No global config is edited.
+OpenCode 2.x uses `--standalone` to isolate the server for each managed terminal.
+
+Observers save only a native session ID, launch identity and activity/completion
+metadata under `.mrmak/`. They do not save prompts or provider credentials.
+Root-session identity is captured from an actual native event, not inferred from
+a shared working directory. Resume passes `--session` with that recorded ID.
+A launch-specific marker prevents stale events from changing a new terminal's
+activity. Native CLI history must remain on disk for conversation restoration.
+
 ## Checks
 
 ```powershell
@@ -64,6 +82,16 @@ UI tests use an isolated repository and fake terminals. Edge must be available
 on Windows, or set `MRMAK_TEST_BROWSER` to a Playwright browser channel you have
 installed. Live voice and subscription smoke checks are separate scripts with
 explicit opt-in flags; they are never part of the default test command.
+
+OpenCode has a separate no-account integration test against a local mock model:
+
+```powershell
+node desktop/service/test-opencode-native.mjs --binary C:\path\to\opencode.exe --tui
+```
+
+It isolates the CLI's home and data directories, verifies two separate native
+histories, then closes and resumes a real terminal. Tested with OpenCode 1.18.3
+and 2.0.21 on Windows. No paid model calls are made.
 
 Windows x64 and Linux are supported native targets. macOS remains a future target;
 the shared platform boundary avoids making Linux behavior a prerequisite for it.

@@ -30,7 +30,7 @@ test('quick command confirmations and empty results are English without a model'
   const commands = ['open card Animation Review', 'archive this card', 'unarchive this card',
     'mark this card done', 'pin this card', 'unpin this card', 'open chat Animation Work',
     'close chat Animation Work', 'open workspace', 'list chats', 'list cards',
-    'what work on 2026-09-10', 'what work on 2026-09-11', 'create codex chat named "Character Review"'];
+    'what work on 2026-09-10', 'what work on 2026-09-11', 'create codex chat named "Character Review"', 'create opencode chat named "Scene Review"'];
   for (const [index, text] of commands.entries()) {
     const result = await actions.ask({ id: String(index), text });
     assert.equal(result?.status, 'completed', text);
@@ -40,4 +40,5 @@ test('quick command confirmations and empty results are English without a model'
   chats = [];
   assert.equal((await actions.ask({ id: 'empty', text: 'list chats' })).result, 'There are no open chats.');
   assert.ok(calls.some(call => call.name === 'open_chat' && call.args.effort === 'xhigh'));
+  assert.ok(calls.some(call => call.name === 'open_chat' && call.args.agent === 'opencode' && call.args.name === 'Scene Review'));
 });

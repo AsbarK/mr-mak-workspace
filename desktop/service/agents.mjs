@@ -3,9 +3,12 @@ import path from 'node:path';
 import { parse as parseEnv } from 'dotenv';
 import { isWindows, resolveCommand, shellCommand, shellLabel } from './platform.mjs';
 
+export { shellCommand };
+
 export const AGENTS = [
   { id: 'codex', label: 'Codex', color: '#88d8bf', command: 'codex', subscription: true },
   { id: 'claude', label: 'Claude Code', color: '#dba68c', command: 'claude', subscription: true },
+  { id: 'opencode', label: 'OpenCode', color: '#c8d2dc', command: 'opencode', subscription: false },
   { id: 'kimi', label: 'Kimi', color: '#b3a3f7', command: 'kimi', subscription: true },
   { id: 'shell', label: shellLabel(), color: '#89b7ed', command: 'shell', subscription: false },
 ];
@@ -43,7 +46,7 @@ export function codexBinary(env = process.env) {
   throw new Error('Codex CLI is not installed. Install it and sign in once to use Mr. Mak.');
 }
 
-export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort } = {}) {
+export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort, opencodeMajor = 1 } = {}) {
   if (!AGENTS.some(item => item.id === agent)) throw new Error('Unknown agent');
   const command = agent === 'shell' ? shellCommand() : { file: commandPath(AGENTS.find(item => item.id === agent).command), args: [] };
   if (!command || !command.file) throw new Error(`${agent} is not installed on this computer`);
@@ -63,8 +66,11 @@ export function terminalCommand(agent, { bypass = false, resumeId, nativeId, eff
   } else if (agent === 'kimi') {
     if (resumeId) args.push('--session', resumeId);
     if (bypass) args.push('--yolo');
-  } else {
-    args.push('-NoLogo');
+  } else if (agent === 'opencode') {
+    // A private v2 server keeps each tab's observer and native session separate.
+    if (opencodeMajor >= 2) args.push('--standalone');
+    if (resumeId) args.push('--session', resumeId);
+    if (bypass) args.push('--auto');
   }
   if (!isWindows || agent === 'shell') return { file: command.file || command, args: [...(command.args || []), ...args] };
   // An encoded PowerShell script preserves spaces, Unicode and quotes. No -NoExit:
@@ -84,7 +90,7 @@ export function childEnvironment(repo) {
   }
   // Drop host-agent identity from the parent so every terminal is an independent CLI.
   for (const key of Object.keys(env)) {
-    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key)) delete env[key];
+    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key) || key.startsWith('MRMAK_OPENCODE_')) delete env[key];
   }
   return env;
 }

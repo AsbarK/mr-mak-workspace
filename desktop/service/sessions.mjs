@@ -12,6 +12,7 @@ import { findCodexChat } from './codex-history.mjs';
 import { englishTitle, restoredTitle } from './titles.mjs';
 import { defaultWorkerEffort, workerEfforts } from './effort.mjs';
 import { ptyOptions } from './platform.mjs';
+import { opencodeVersion, opencodeEnvironment, readOpencodeState, watchOpencode } from './opencode.mjs';
 
 const { Terminal } = headless;
 const publicSession = session => {
@@ -101,14 +102,14 @@ export class Sessions extends EventEmitter {
     });
     this.items.set(session.id, session);
     await this.hydrate(session);
-    try { this.launch(session, options.resumeId, await this.nativeBoundary(session, options.resumeId)); }
+    try { await this.launch(session, options.resumeId, await this.nativeBoundary(session, options.resumeId)); }
     catch (error) { this.items.delete(session.id); session.terminal.dispose(); throw error; }
     await this.persist();
     return publicSession(session);
   }
 
   async importConversation({ agent, nativeId, name, cwd, pinned = false, bypass = false }) {
-    if (!['codex', 'claude', 'kimi'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
+    if (!['codex', 'claude', 'opencode', 'kimi'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
     nativeId = nativeId.trim();
     cwd = path.resolve(cwd || this.repo);
     if (!(await stat(cwd)).isDirectory()) throw new Error('Working folder must be a directory');
@@ -120,9 +121,19 @@ export class Sessions extends EventEmitter {
     return publicSession(session);
   }
 
-  launch(session, resumeId, nativeWatch) {
-    const command = terminalCommand(session.agent, { bypass: session.bypass, resumeId, nativeId: session.nativeId, effort: session.effort });
-    const env = childEnvironment(this.repo);
+  async launch(session, resumeId, nativeWatch) {
+    let env = childEnvironment(this.repo);
+    let opencodeMajor;
+    if (session.agent === 'opencode') {
+      opencodeMajor = await opencodeVersion(env);
+      // v2 explicitly accepts a new ID through --session. Assign it before
+      // launch, so even a very early close retains an exact resume target.
+      if (opencodeMajor === 2 && !session.nativeId) session.nativeId = `ses_${randomUUID().replaceAll('-', '')}`;
+      if (opencodeMajor === 2) resumeId ||= session.nativeId;
+      env = opencodeEnvironment(env, { stateDir: this.stateDir, session, major: opencodeMajor });
+    }
+    if (this.closed || !session.open) throw new Error('The chat was closed before its terminal started.');
+    const command = terminalCommand(session.agent, { bypass: session.bypass, resumeId, nativeId: session.nativeId, effort: session.effort, opencodeMajor });
     if (session.agent === 'codex') env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE = `mrmak_chat_${session.id}`;
     const proc = pty.spawn(command.file, command.args, ptyOptions({ cwd: session.cwd, env, cols: session.cols, rows: session.rows }));
     session.process = proc;
@@ -166,10 +177,24 @@ export class Sessions extends EventEmitter {
         const match = /codex resume ([a-f0-9-]{36})/i.exec(screen);
         if (match) { session.nativeId = match[1]; this.changed(session); }
       }).catch(() => {});
+      if (session.agent === 'opencode') readOpencodeState(this.stateDir, session.id).then(state => {
+        if (state?.launchId === env.MRMAK_OPENCODE_LAUNCH_ID) {
+          this.bindNative(session, { id: state.nativeId });
+          if (state.completion && session.nativeId === state.nativeId) this.nativeEvent(session, { kind: 'turn-completed', id: state.completion });
+        }
+      }).catch(() => {});
     });
     this.changed(session);
     // Discovery is read-only, and only accepts an unambiguous native session.
     this.beginDiscovery(session);
+    if (session.agent === 'opencode') session.stopNativeWatch = watchOpencode(this.stateDir, session, env.MRMAK_OPENCODE_LAUNCH_ID, state => {
+      this.bindNative(session, { id: state.nativeId });
+      if (session.nativeId !== state.nativeId) return;
+      if (state.completion) this.nativeEvent(session, { kind: 'turn-completed', id: state.completion });
+      if (state.activity === 'working') this.nativeEvent(session, { kind: 'turn-started' });
+      else if (state.activity === 'waiting') this.nativeEvent(session, { kind: 'attention' });
+      else if (state.activity === 'idle' && session.activity !== 'idle') this.nativeEvent(session, { kind: 'turn-interrupted' });
+    });
     if (nativeWatch) this.watchNative(session, nativeWatch.file, nativeWatch.offset);
     else if (session.agent === 'claude' && session.nativeId) claudeTranscript(session.cwd, session.nativeId).then(file => {
       if (session.process === proc) this.watchNative(session, file);
@@ -230,6 +255,11 @@ export class Sessions extends EventEmitter {
   }
 
   async recoverNative(session) {
+    if (session.agent === 'opencode' && !session.nativeId) {
+      const state = await readOpencodeState(this.stateDir, session.id);
+      if (state) this.bindNative(session, { id: state.nativeId });
+      return;
+    }
     if (session.agent !== 'codex' || session.nativeId) return;
     this.bindNative(session, await findCodexChat(session, { full: true }));
   }
@@ -355,7 +385,18 @@ export class Sessions extends EventEmitter {
     const file = !resumeId ? null : session.agent === 'codex' ? await codexTranscript(resumeId) : session.agent === 'claude' ? await claudeTranscript(session.cwd, resumeId) : null;
     return file ? { file, offset: (await stat(file).catch(() => null))?.size || 0 } : null;
   }
-  stop(id) { const session = this.get(id); session.process?.kill(); return { stopped: !!session.process }; }
+  stop(id) { const session = this.get(id); this.requestStop(session); return { stopped: !!session.process }; }
+  requestStop(session) {
+    const proc = session.process;
+    if (!proc) return;
+    if (session.agent !== 'opencode') { proc.kill(); return; }
+    // Let OpenCode flush and close its SQLite store before ConPTY is destroyed.
+    // Ctrl+C cancels work; a second press exits the native TUI. Custom keymaps
+    // or an unresponsive CLI still have a bounded hard-stop fallback.
+    proc.write('\x03');
+    setTimeout(() => { try { if (session.process === proc) proc.write('\x03'); } catch { /* Process already exited. */ } }, 500).unref();
+    setTimeout(() => { try { if (session.process === proc) proc.kill(); } catch { /* Process already exited. */ } }, 3500).unref();
+  }
   async resume(id, nativeId) {
     if (this.closed) throw new Error('Mr. Mak is shutting down');
     const session = this.get(id);
@@ -374,8 +415,13 @@ export class Sessions extends EventEmitter {
     // Capture the boundary before launching the resumed CLI. Even an immediate
     // submitted task must be observed, while historic answers stay acknowledged.
     const nativeWatch = await this.nativeBoundary(session, resumeId);
+    if (session.process) return publicSession(session);
     session.open = true; session.updatedAt = new Date().toISOString();
-    this.launch(session, resumeId, nativeWatch);
+    if (session.launching) await session.launching;
+    else {
+      session.launching = this.launch(session, resumeId, nativeWatch);
+      try { await session.launching; } finally { session.launching = null; }
+    }
     await this.persist();
     return publicSession(session);
   }
@@ -389,7 +435,7 @@ export class Sessions extends EventEmitter {
       session.stopping = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => { subscription.dispose(); reject(new Error('The terminal is still closing. Try reopening it in a moment.')); }, 8000);
         const subscription = proc.onExit(() => { clearTimeout(timeout); subscription.dispose(); resolve(); });
-        try { proc.kill(); } catch (error) { clearTimeout(timeout); subscription.dispose(); reject(error); }
+        try { this.requestStop(session); } catch (error) { clearTimeout(timeout); subscription.dispose(); reject(error); }
       }).finally(() => { session.stopping = null; });
     }
     this.changed(session);
@@ -411,6 +457,14 @@ export class Sessions extends EventEmitter {
   }
   async close() {
     this.closed = true; clearInterval(this.timer);
+    // Preserve the open-tab flags on app quit while giving OpenCode time to
+    // close the database used by the next launch.
+    await Promise.all([...this.items.values()].filter(s => s.agent === 'opencode' && s.process).map(session => new Promise(resolve => {
+      const proc = session.process;
+      const timer = setTimeout(() => { subscription.dispose(); resolve(); }, 5000);
+      const subscription = proc.onExit(() => { clearTimeout(timer); subscription.dispose(); resolve(); });
+      try { this.requestStop(session); } catch { clearTimeout(timer); subscription.dispose(); resolve(); }
+    })));
     for (const session of this.items.values()) { session.stopNativeWatch?.(); session.process?.kill(); this.flushOutput(session); }
     await this.persist();
     for (const session of this.items.values()) session.terminal?.dispose();

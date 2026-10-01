@@ -12,11 +12,12 @@ try {
   $taskCargo = Get-Command cargo -ErrorAction SilentlyContinue
   $taskCodex = Get-Command codex -ErrorAction SilentlyContinue
   $taskClaude = Get-Command claude -ErrorAction SilentlyContinue
+  $taskOpenCode = Get-Command opencode -ErrorAction SilentlyContinue
   Write-Host 'Mr. Mak Workspace setup'
   Write-Host ('Node: ' + [bool]$taskNode + ' | npm: ' + [bool]$taskNpm + ' | Rust: ' + [bool]$taskCargo)
-  Write-Host ('Codex CLI: ' + [bool]$taskCodex + ' | Claude Code CLI: ' + [bool]$taskClaude)
-  if (-not $taskCodex -and -not $taskClaude) {
-    throw 'Install and sign in to Codex CLI and/or Claude Code CLI before setting up this Workspace. See docs/getting-started.md.'
+  Write-Host ('Codex CLI: ' + [bool]$taskCodex + ' | Claude Code CLI: ' + [bool]$taskClaude + ' | OpenCode: ' + [bool]$taskOpenCode)
+  if (-not $taskCodex -and -not $taskClaude -and -not $taskOpenCode) {
+    throw 'Install and configure Codex CLI, Claude Code CLI or OpenCode before setting up this Workspace. See docs/getting-started.md.'
   }
   if ($Mode -eq 'Check') {
     Write-Host 'The Windows installer needs no build toolchain. See docs/getting-started.md.'
