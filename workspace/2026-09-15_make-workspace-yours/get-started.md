@@ -4,10 +4,10 @@ Mr. Mak is a local desktop workspace for working with several agents. Its files
 are ordinary project files, and its chats are ordinary CLI sessions. You can
 keep using the same agents outside the app.
 
-**Required before setup: Codex CLI and/or Claude Code CLI, installed and signed
-in with your own account.** At least one is required to install and use the
-Workspace with an agent. Use either CLI to guide the setup below. The optional
-voice coordinator requires Codex specifically; Kimi is an additional integration.
+**Required before setup: Codex CLI, Claude Code CLI or OpenCode, installed and
+configured with your own account.** Use at least one to guide the setup below.
+The optional voice coordinator requires Codex specifically; Kimi is another
+available terminal integration.
 
 ## Choose a folder
 
@@ -34,6 +34,7 @@ Install at least one required CLI using its current official Windows instruction
 
 - [Codex CLI](https://developers.openai.com/codex/cli)
 - [Claude Code](https://code.claude.com/docs/en/setup)
+- [OpenCode](https://opencode.ai/docs/)
 
 [Kimi Code CLI](https://moonshotai.github.io/kimi-cli/en/) is available as an
 additional terminal integration after the base setup.
@@ -45,6 +46,32 @@ permission flow is enabled by default; bypass is a deliberate per-chat choice.
 
 Try: “Read the My Dream Game example and turn it into a small project plan for
 my game. Ask me for the missing game idea before replacing the example.”
+
+## Subscriptions, API keys and OpenCode
+
+Claude Code can use a Claude Pro or Max login. Codex can use an eligible ChatGPT
+subscription login. You do not need to add an API key to Mr. Mak for those chats:
+it starts the real installed CLI and keeps its normal authentication and limits.
+See [Claude authentication](https://code.claude.com/docs/en/authentication) and
+[Codex authentication](https://developers.openai.com/codex/auth).
+
+For OpenCode, install and configure it first using its own provider setup. Check
+that `opencode` runs from a terminal, then choose **+ > OpenCode** in Mr. Mak.
+Your chosen provider determines authentication and billing. A native Claude Code
+subscription does not automatically provide access through third-party clients.
+
+OpenCode chats support History, pinned tabs, files and clipboard screenshots.
+The app observes native session events to keep the correct conversation ID;
+your native OpenCode data must remain available for resume. Keep one conversation
+per Mr. Mak tab. Use a new tab for a new task. OpenCode controls its model and
+reasoning settings. Auto-approve is off by default, and explicit deny rules still
+apply when it is enabled.
+
+OpenCode 1.x and 2.x use different plugin APIs. Mr. Mak selects the corresponding
+small session observer at launch, without writing global configuration. OpenCode
+2.x runs a private server for each terminal so tab histories stay separate.
+The MCP inspector currently lists Claude, Codex, Kimi and Cursor configurations;
+use OpenCode's native MCP controls to inspect its own connections.
 
 ## Explore the examples
 

@@ -4,6 +4,19 @@ Work with your agents in Chats. Read, compare and keep their results in Workspac
 Your project folders connect the two. You can use the Workspace without reading
 source code or moving every conversation into one agent's app.
 
+## Accounts and API keys
+
+Claude Code and Codex chats use the real installed CLI with its existing login.
+An eligible Claude Pro/Max or ChatGPT subscription can be used without adding an
+API key to Mr. Mak. Normal plan limits apply. Only the optional voice connection
+requires an OpenAI API key; optional generation services use their own accounts.
+
+OpenCode is available in **+ > OpenCode** after installation. Configure its models
+and providers in OpenCode; their authentication and billing rules apply. History
+and pinned tabs keep its native conversation ID. Keep one conversation per tab.
+OpenCode connections are managed in its own MCP controls, separately from the
+Workspace MCP inspector.
+
 ## Start with one task
 
 1. In Chats, press **+**, choose your agent and its working folder, and give the

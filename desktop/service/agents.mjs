@@ -6,13 +6,14 @@ import { parse as parseEnv } from 'dotenv';
 export const AGENTS = [
   { id: 'codex', label: 'Codex', color: '#88d8bf', command: 'codex', subscription: true },
   { id: 'claude', label: 'Claude Code', color: '#dba68c', command: 'claude', subscription: true },
+  { id: 'opencode', label: 'OpenCode', color: '#c8d2dc', command: 'opencode', subscription: false },
   { id: 'kimi', label: 'Kimi', color: '#b3a3f7', command: 'kimi', subscription: true },
   { id: 'shell', label: 'PowerShell', color: '#89b7ed', command: 'powershell.exe', subscription: false },
 ];
 
 export function commandPath(name, env = process.env) {
   if (path.isAbsolute(name) && existsSync(name)) return name;
-  const extra = [path.join(env.APPDATA || '', 'npm'), path.join(os.homedir(), '.kimi-code', 'bin'), path.join(os.homedir(), '.local', 'bin')];
+  const extra = [path.join(env.APPDATA || '', 'npm'), path.join(os.homedir(), '.kimi-code', 'bin'), path.join(os.homedir(), '.opencode', 'bin'), path.join(os.homedir(), '.local', 'bin')];
   const extensions = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', '.ps1', ''] : [''];
   for (const folder of [...String(env.PATH || env.Path || '').split(path.delimiter), ...extra]) {
     for (const ext of extensions) {
@@ -45,7 +46,7 @@ export function codexBinary(env = process.env) {
   throw new Error('Codex CLI is not installed. Install it and sign in once to use Mr. Mak.');
 }
 
-export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort } = {}) {
+export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort, opencodeMajor = 1 } = {}) {
   if (!AGENTS.some(item => item.id === agent)) throw new Error('Unknown agent');
   const command = commandPath(AGENTS.find(item => item.id === agent).command);
   if (!command) throw new Error(`${agent} is not installed on this computer`);
@@ -64,10 +65,20 @@ export function terminalCommand(agent, { bypass = false, resumeId, nativeId, eff
   } else if (agent === 'kimi') {
     if (resumeId) args.push('--session', resumeId);
     if (bypass) args.push('--yolo');
+  } else if (agent === 'opencode') {
+    // A private v2 server keeps each tab's observer and native session separate.
+    if (opencodeMajor >= 2) args.push('--standalone');
+    if (resumeId) args.push('--session', resumeId);
+    if (bypass) args.push('--auto');
   } else {
     args.push('-NoLogo');
   }
   if (process.platform !== 'win32' || agent === 'shell') return { file: command, args };
+  return shellCommand(command, args);
+}
+
+export function shellCommand(command, args) {
+  if (process.platform !== 'win32') return { file: command, args };
   // An encoded PowerShell script preserves spaces, Unicode and quotes. No -NoExit:
   // after the agent exits, stale coordinator input cannot become shell commands.
   const quote = value => "'" + value.replaceAll("'", "''") + "'";
@@ -85,7 +96,7 @@ export function childEnvironment(repo) {
   }
   // Drop host-agent identity from the parent so every terminal is an independent CLI.
   for (const key of Object.keys(env)) {
-    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key)) delete env[key];
+    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key) || key.startsWith('MRMAK_OPENCODE_')) delete env[key];
   }
   return env;
 }

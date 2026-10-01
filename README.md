@@ -6,16 +6,28 @@ Mr. Mak gives you two connected windows: real CLI chats on the left, and a
 Workspace for projects, research, images and files. Keep both open, or minimize
 the Workspace while an agent helps you in Blender, a game engine or your browser.
 
-**Prerequisite: install and sign in to Codex CLI and/or Claude Code CLI before
-setting up Mr. Mak.** You need at least one of these CLIs to install and use this
-agent-first Workspace. Both can be used side by side. They are separate
-installations and are not bundled with Mr. Mak.
+**Prerequisite: install and configure Codex CLI, Claude Code CLI or OpenCode
+before setting up Mr. Mak.** You need at least one. They can run side by side
+and are separate installations, not bundled with Mr. Mak.
 
 - [Install Codex CLI](https://developers.openai.com/codex/cli)
 - [Install Claude Code CLI](https://code.claude.com/docs/en/setup)
+- [Install OpenCode](https://opencode.ai/docs/)
 
-The optional voice coordinator specifically requires **Codex CLI**, even when
-Claude Code handles your main tasks. Voice also needs your own OpenAI API key.
+**Do I need an API key?** No, not for Claude Code or Codex chats when you sign
+in with an eligible subscription. Mr. Mak runs the real CLI with its existing
+login: Claude Pro/Max can use Claude Code, and Codex can use ChatGPT subscription
+access. Normal plan limits still apply. API billing is an alternative, not a
+requirement. See [Claude authentication](https://code.claude.com/docs/en/authentication)
+and [Codex authentication](https://developers.openai.com/codex/auth).
+
+**OpenCode** uses the providers and authentication you configure in OpenCode.
+Their access and billing rules still apply; support here does not turn a Claude
+Code subscription into OpenCode API access. Choose **+ > OpenCode** in Chats.
+
+The optional voice coordinator specifically requires **Codex CLI** and your own
+**OpenAI API key**. Voice API usage is billed separately. Leave voice off to use
+subscription-backed CLI chats without an API key.
 
 ![Mr. Mak Workspace home with project cards and the Files tree open](docs/assets/workspace-overview.png)
 
@@ -41,8 +53,8 @@ Claude Code handles your main tasks. Voice also needs your own OpenAI API key.
 ## Start with an agent
 
 Use **Use this template** on GitHub to create your own repository, then clone it
-into a folder you control. Open that folder in your installed Codex CLI or
-Claude Code CLI and paste:
+into a folder you control. Open that folder in your installed Codex CLI,
+Claude Code CLI or OpenCode and paste:
 
 > Set up this Mr. Mak Workspace repository on my computer. Read AGENTS.md and
 > docs/getting-started.md, check the prerequisites, and help me run the Windows
@@ -63,10 +75,10 @@ your own agent accounts and any services you want to use.
 3. Use **+** in Chats to open an installed CLI. Sign in with your own account.
 
 The installer includes the local Node service. It does not include Codex,
-Claude Code, Kimi, Blender, Python or provider accounts.
+Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.4.15 update notes](CHANGELOG.md) for browser
-preview, source setup and local service security improvements. Follow the
+**Already using Mr. Mak?** Read the [0.4.16 update notes](CHANGELOG.md) for OpenCode
+chats, session recovery and clearer subscription setup instructions. Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.
 
@@ -101,6 +113,7 @@ Terminal text settings let you adjust readability. In agent chats, Ctrl+C copies
 selected text; PowerShell keeps normal shell behavior.
 Click web links in chats or cards to open your default browser. New Codex and
 Claude chats start with `xhigh` effort; saved effort choices are preserved.
+OpenCode keeps its own model and reasoning configuration.
 
 ## Skills you can keep
 

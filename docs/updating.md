@@ -7,7 +7,7 @@ context, credentials or agent conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.4.15** for Windows x64.
+2. Install **Mr. Mak Workspace 0.4.16** for Windows x64.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
@@ -16,6 +16,12 @@ still exists but whose ID was not saved by Mr. Mak. If that native history was
 deleted or belongs to another account, the update cannot recreate it. Use
 New chat > Resume with a known native ID when importing an existing CLI chat.
 Saved terminal screens are retained when automatic recovery is not possible.
+
+Version 0.4.16 adds **OpenCode** to New chat, History and the default-agent
+setting. Install and configure OpenCode separately, then reopen Mr. Mak if the
+command was just added to PATH. Existing Codex and Claude chats keep their login
+and settings. No API key is needed for their subscription-backed CLI chats;
+voice remains optional and uses a separately billed OpenAI API connection.
 
 ## Skills and source
 
@@ -37,8 +43,8 @@ keys, CLI logins or MCP definitions are included. The pack does not replace your
 
 The maintained skills live in `.agents/skills`; complete Claude copies live in
 `.claude/skills`. Keep both in sync if you use both agents. Dependencies are
-listed in [the skill index](skills.md) and in each skill. A Codex CLI or Claude
-Code CLI login remains required; optional providers use your own credentials.
+listed in [the skill index](skills.md) and in each skill. A configured Codex CLI, Claude
+Code CLI or OpenCode remains required; optional providers use your own credentials.
 
 If building the desktop from source, rebuild after merging application changes.
 Use the [setup guide](getting-started.md) for the prerequisites.

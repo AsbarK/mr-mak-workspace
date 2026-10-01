@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.16 - 2026-10-01
+
+- Added OpenCode to New chat, History and the default-agent setting. It runs the
+  installed native CLI with its own providers, account login and model settings.
+- OpenCode conversations keep their native session IDs for close/reopen and app
+  restart. Native activity drives the working glow and unread completion marker.
+  OpenCode 1.x and 2.x have separate observers; v2 terminals use private servers.
+- OpenCode uses the existing tab colors, pinning, file drops, clipboard images,
+  copy controls and fullscreen terminal scrolling. Voice can open OpenCode chats.
+- Clarified subscription setup in README, Help and the setup guide. Claude Code
+  and Codex can use eligible existing subscriptions without an API key. Optional
+  voice uses a separately billed OpenAI API connection. OpenCode's selected
+  providers determine its own authentication and billing.
+- Setup now accepts OpenCode as the primary CLI. Permission auto-approval remains
+  off by default; OpenCode's explicit deny rules remain in effect when enabled.
+
+**Update:** finish active tasks, quit Mr. Mak and install the Windows update.
+Install and configure OpenCode separately if you want to use it. Existing chats
+and project content are preserved. The 0.4.14 skills pack is unchanged.
+
 ## 0.4.15 - 2026-09-30
 
 - Fixed browser preview crashing on Markdown cards with links or images. Local
