@@ -201,10 +201,16 @@ test('pasted images are saved in inbox and inserted as a quoted path without sub
     assert.equal(unauthenticated.status, 401);
     const shell = await service.sessions.create({ agent: 'shell', name: 'Attachment input', cwd: repo });
     await terminalReady(service, shell.id);
+    const terminal = service.sessions.get(shell.id).process;
+    const writes = [];
+    const nativeWrite = terminal.write.bind(terminal);
+    terminal.write = text => { writes.push(text); nativeWrite(text); };
     const attached = await fetch(service.origin + `/api/sessions/${shell.id}/attach`, { method: 'POST', headers: { Authorization: `Bearer ${service.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: [saved.path] }) });
     assert.equal(attached.status, 200);
     assert.equal((await attached.json()).submitted, false);
-    await until(async () => (await service.sessions.read(shell.id, 150)).screen.includes('Screenshot sample'));
+    assert.equal(writes.length, 1);
+    assert.ok(writes[0].includes('Screenshot sample'));
+    assert.equal(/[\r\n\x1b]/.test(writes[0]), false);
     assert.equal(service.sessions.get(shell.id).status, 'running');
   } finally { await service.close(); }
 });
