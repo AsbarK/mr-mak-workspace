@@ -1,16 +1,26 @@
 import {createReadStream} from 'node:fs';
 import {Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
+import {reportThemeCSS} from './report-theme.mjs';
 
-// Shared browser chrome and external-link routing. Document layouts, artwork,
-// scripts and explicitly styled body colours remain owned by the report.
-const prelude = Buffer.from(`<meta name="color-scheme" content="dark"><style data-mrmak-chrome>
+// Shared browser chrome and external-link routing. The selected reader theme
+// applies to standard reports; custom designs and artwork keep their colours.
+function preludeFor({theme = 'dark', parentOrigin = ''} = {}) {
+  theme = theme === 'light' ? 'light' : 'dark';
+  const trustedOrigin = JSON.stringify(parentOrigin).replace(/</g, '\\u003c');
+  return Buffer.from(`<meta name="color-scheme" content="${theme}"><style data-mrmak-chrome>
 html{color-scheme:dark;background-color:#101115;color:#d3d0d9}
 html,body,body *{scrollbar-color:#514c59 #111217!important;scrollbar-width:thin}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:#111217!important}
 ::-webkit-scrollbar-thumb{background:#514c59!important;border:2px solid #111217;border-radius:6px}
+${reportThemeCSS}
 </style><script data-mrmak-links>
 (() => {
+  const setTheme = theme => { if (theme === 'dark' || theme === 'light') document.documentElement.dataset.mrmakTheme = theme; };
+  setTheme('${theme}');
+  window.addEventListener('message', event => {
+    if (event.source === parent && event.origin === ${trustedOrigin} && event.data?.type === 'mrmak:theme') setTheme(event.data.theme);
+  });
   const route = event => {
     const link = event.target.closest?.('a[href]');
     if (!link || link.hasAttribute('download') || event.defaultPrevented) return;
@@ -23,8 +33,10 @@ html,body,body *{scrollbar-color:#514c59 #111217!important;scrollbar-width:thin}
   document.addEventListener('auxclick', route, true);
 })();
 </script>`);
+}
 
-export function reportChromeStream() {
+export function reportChromeStream(options) {
+  const prelude = preludeFor(options);
   let pending = Buffer.alloc(0), inserted = false;
   const emit = function () {
     const text = pending.toString('utf8');
@@ -50,9 +62,11 @@ export function reportChromeStream() {
 }
 
 export async function serveReport(request, response, file, info, headers) {
+  const options = {theme: new URL(request.url, 'http://localhost').searchParams.get('mrmak-theme'), parentOrigin: headers['Access-Control-Allow-Origin'] || ''};
+  const prelude = preludeFor(options);
   response.writeHead(200, {'Content-Type':'text/html; charset=utf-8', 'Content-Length':info.size + prelude.length, 'Cache-Control':'no-cache', 'X-Content-Type-Options':'nosniff', ...headers});
   if (request.method === 'HEAD') { response.end(); return; }
-  await pipeline(createReadStream(file), reportChromeStream(), response).catch(error => {
+  await pipeline(createReadStream(file), reportChromeStream(options), response).catch(error => {
     if (!request.destroyed && !response.destroyed) throw error;
   });
 }

@@ -39,6 +39,9 @@ subscription-backed CLI chats without an API key.
 - **Readable notes you can edit.** Open Markdown as a formatted document, switch
   to Edit, and save changes in the same window. Preview images, video and audio
   alongside the file tree.
+- **Choose a reading theme.** Settings > Appearance offers Dark, Light and
+  System. Light uses dark text on white across Workspace and standard reports.
+  Images keep their original colors; terminal appearance is set separately.
 - **Chats you can return to.** Pin conversations in history, reorder and color
   tabs, and see which agents are working or have a reply you have not viewed.
   Drop files or folders into a chat to insert their paths; clipboard images are
@@ -77,8 +80,8 @@ your own agent accounts and any services you want to use.
 The installer includes the local Node service. It does not include Codex,
 Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.4.16 update notes](CHANGELOG.md) for OpenCode
-chats, session recovery and clearer subscription setup instructions. Follow the
+**Already using Mr. Mak?** Read the [0.4.17 update notes](CHANGELOG.md) for Workspace
+themes and browser preview fixes. Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.
 

@@ -77,6 +77,26 @@ try {
   await dialog.waitFor({ state: 'hidden' });
   assert.deepEqual(errors, []);
 
+  // Browser-only Settings use local storage and style embedded reports too.
+  await page.getByRole('button', { name: 'Workspace settings', exact: true }).click();
+  await page.getByLabel('Workspace theme', { exact: true }).selectOption('light');
+  await page.getByRole('button', { name: 'Workspace settings', exact: true }).click();
+  assert.equal(await page.locator('html').getAttribute('data-workspace-theme'), 'light');
+  assert.equal(await page.locator('.mak-markdown h1').evaluate(node => getComputedStyle(node).color), 'rgb(17, 21, 33)');
+  await page.getByRole('img', { name: 'Reference', exact: true }).click();
+  await dialog.waitFor();
+  assert.equal(await dialog.evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(242, 244, 247)');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.goto(`${url}#/creative-mcp/0`);
+  await page.locator('.report-document[aria-busy=false]').waitFor();
+  const report = page.frameLocator('iframe.report-frame');
+  assert.equal(await report.locator('html').getAttribute('data-mrmak-theme'), 'light');
+  assert.equal(await report.locator('body').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(255, 255, 255)');
+  await page.reload();
+  await page.locator('.report-document[aria-busy=false]').waitFor();
+  assert.equal(await page.locator('html').getAttribute('data-workspace-theme'), 'light');
+  assert.deepEqual(errors, []);
+
   // A blocked module used to unmount the entire React tree. Keep navigation,
   // show the actual error, and let a reload recover once the block is gone.
   const failed = await browser.newPage();

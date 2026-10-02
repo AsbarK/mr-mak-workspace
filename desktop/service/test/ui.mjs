@@ -41,7 +41,7 @@ try {
   for (let index = 0; index < 12; index++) { await page.getByRole('tab').nth(index).click(); await page.frameLocator('iframe.report-frame').getByRole('heading', { name: `Document ${index + 1}`, exact: true }).waitFor(); }
   let releaseReport;
   const delayedReport = new Promise(resolve => { releaseReport = resolve; });
-  await page.route('**/workspace/test/step0.html', async route => { if (route.request().method() === 'GET') await delayedReport; await route.continue(); });
+  await page.route('**/workspace/test/step0.html*', async route => { if (route.request().method() === 'GET') await delayedReport; await route.continue(); });
   await page.getByRole('tab').nth(0).click();
   try {
     await page.getByRole('status').filter({ hasText: 'Opening report' }).waitFor();
@@ -50,7 +50,7 @@ try {
   } finally { releaseReport(); }
   await page.locator('.report-document[aria-busy=false]').waitFor();
   assert.equal(await page.frameLocator('iframe.report-frame').locator('body').evaluate(element => getComputedStyle(element).scrollbarColor), 'rgb(81, 76, 89) rgb(17, 18, 23)');
-  await page.unroute('**/workspace/test/step0.html');
+  await page.unroute('**/workspace/test/step0.html*');
   await page.route('**/workspace/test/step1.html', route => route.request().method() === 'HEAD' ? route.fulfill({ status: 404 }) : route.continue());
   await page.getByRole('tab').nth(1).click();
   await page.getByText('Page unavailable (404).', { exact: true }).waitFor();
