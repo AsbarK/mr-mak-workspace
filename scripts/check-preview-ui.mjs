@@ -1,4 +1,4 @@
-// Exercise browser-only preview as a fresh clone, including a failed lazy import.
+// Exercise browser-only preview with the real predev setup, including a failed lazy import.
 // No desktop service, CLI sessions, or user profile is opened.
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
@@ -8,8 +8,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Setup.ps1 -Mode Preview runs npm run dev, which creates this public junction.
+// Omitting it hides CSS module failures caused by Vite's public-file middleware.
+await import('./ensure-workspace-link.mjs');
 const { entities } = JSON.parse(await readFile(path.join(root, 'workspace/workspace.json')));
-const server = await createServer({ root, server: { host: '127.0.0.1', port: 0, open: false, watch: null, hmr: false } });
+const server = await createServer({ root, server: { host: '127.0.0.1', port: 0, open: false, watch: null } });
 let browser;
 try {
   await server.listen();
@@ -19,6 +22,7 @@ try {
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto(url);
   let steps = 0;
   for (const entity of entities) {
@@ -50,6 +54,10 @@ try {
   const mdEntity = entities.find(entity => entity.steps.some(step => /\.md$/i.test(step.path)));
   const mdIndex = mdEntity.steps.findIndex(step => /\.md$/i.test(step.path));
   const mdPath = `/workspace/${mdEntity.folder}/${mdEntity.steps[mdIndex].path}`;
+  await page.route(new URL('../reference.png', new URL(mdPath, url)).href, route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="pink"/></svg>',
+  }));
   await page.route(new URL(mdPath, url).href, route => route.fulfill({
     contentType: 'text/plain',
     body: '# Relative references\n\n[Local file](../notes.md)\n\n[External](https://example.com/)\n\n![Reference](../reference.png)',
@@ -59,6 +67,14 @@ try {
   assert.equal(await page.getByRole('link', { name: 'Local file', exact: true }).getAttribute('href'), new URL('../notes.md', new URL(mdPath, url)).href);
   assert.equal(await page.getByRole('link', { name: 'External', exact: true }).getAttribute('href'), 'https://example.com/');
   assert.equal(await page.getByRole('img', { name: 'Reference', exact: true }).getAttribute('src'), new URL('../reference.png', new URL(mdPath, url)).href);
+  // The shared stylesheet must still style the app's image dialog after bundling.
+  await page.getByRole('img', { name: 'Reference', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Image preview', exact: true });
+  await dialog.waitFor();
+  assert.equal(await dialog.evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(12, 13, 17)');
+  assert.equal(await dialog.evaluate(node => getComputedStyle(node).display), 'flex');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
   assert.deepEqual(errors, []);
 
   // A blocked module used to unmount the entire React tree. Keep navigation,

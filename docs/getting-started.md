@@ -128,7 +128,10 @@ builds an installer in `src-tauri/target/release/bundle/nsis`. It does not insta
 or restart the app for you. An agent should prepare updates, then ask before
 interrupting active chats with an install or restart.
 
-For a report-only browser preview:
+For a report-only browser preview, only Node.js 22.20+ and npm are needed beyond
+the CLI prerequisite above. **Rust, Cargo and C++ Build Tools are not required
+for Preview or the downloaded Windows installer.** They are needed only to
+compile the desktop app from source.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Preview

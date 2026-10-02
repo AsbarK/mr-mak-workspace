@@ -90,8 +90,10 @@ powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Check
 powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Desktop
 ```
 
-For a browser preview of the reports, use `-Mode Preview`. The native desktop
-app adds managed terminals, local file operations and voice.
+For a browser preview of the reports, use `-Mode Preview` with Node.js 22.20+
+and npm. Rust and C++ Build Tools are needed only to compile the native desktop
+app; they are not required for Preview or the downloaded installer. The native
+desktop app adds managed terminals, local file operations and voice.
 See [getting started](docs/getting-started.md) for the complete setup and
 [architecture](desktop/README.md) for the source layout.
 

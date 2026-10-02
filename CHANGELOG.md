@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Fixed browser preview failing to open every card after the normal setup
+  created `public/workspace`. Shared report CSS now goes through the app's
+  stylesheet pipeline instead of being requested as a JavaScript module.
+- Fixed image dialogs closing immediately in development mode and kept them
+  outside Markdown paragraphs, so enlarged images remain usable.
+- Removed the Vite `__dirname` warning and clarified that Rust is needed only
+  when compiling the native desktop app, not for browser preview.
+- Browser checks now run the same workspace-link setup as `npm run dev`, and
+  verify card navigation, shared dialog styling and recovery after a failed load.
+
+**Browser preview update:** merge the latest source, stop your Preview server,
+then run `Setup.ps1 -Mode Preview` again and reload the browser. These source
+fixes do not require a new desktop installer. Issue #1 stays open for confirmation
+from the reporter.
+
 ## 0.4.16 - 2026-10-01
 
 - Added OpenCode to New chat, History and the default-agent setting. It runs the

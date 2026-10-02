@@ -14,7 +14,7 @@ try {
   $taskClaude = Get-Command claude -ErrorAction SilentlyContinue
   $taskOpenCode = Get-Command opencode -ErrorAction SilentlyContinue
   Write-Host 'Mr. Mak Workspace setup'
-  Write-Host ('Node: ' + [bool]$taskNode + ' | npm: ' + [bool]$taskNpm + ' | Rust: ' + [bool]$taskCargo)
+  Write-Host ('Node: ' + [bool]$taskNode + ' | npm: ' + [bool]$taskNpm + ' | Rust (desktop source build only): ' + [bool]$taskCargo)
   Write-Host ('Codex CLI: ' + [bool]$taskCodex + ' | Claude Code CLI: ' + [bool]$taskClaude + ' | OpenCode: ' + [bool]$taskOpenCode)
   if (-not $taskCodex -and -not $taskClaude -and -not $taskOpenCode) {
     throw 'Install and configure Codex CLI, Claude Code CLI or OpenCode before setting up this Workspace. See docs/getting-started.md.'

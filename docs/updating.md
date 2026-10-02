@@ -25,9 +25,15 @@ voice remains optional and uses a separately billed OpenAI API connection.
 
 ## Skills and source
 
-For a browser-only preview, merge the source fixes, run `npm ci`, and restart
-Vite. Version 0.4.15 fixes Markdown card links and images that could leave the
-browser view blank. Root `npm ci` also installs the local service dependencies.
+For a browser-only preview, merge the source fixes, stop your Preview server,
+then run `Setup.ps1 -Mode Preview` and reload the browser. Setup runs `npm ci`
+and starts Vite. Rust is not required for this mode. Root `npm ci` also installs
+the local service dependencies.
+
+The latest source includes a follow-up to the 0.4.15 preview fix: a shared
+stylesheet could prevent the card viewer from loading after normal setup.
+Direct HTML links still worked in that case. Updating the source fixes the
+embedded viewer; downloading an installer alone does not update Preview.
 
 An installer alone cannot add the new skills. For a clone that tracks this
 repository, ask your agent to review and merge the release's source changes.
