@@ -7,7 +7,7 @@ context, credentials or agent conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.4.16** for Windows x64.
+2. Install **Mr. Mak Workspace 0.4.17** for Windows x64.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
@@ -17,7 +17,13 @@ deleted or belongs to another account, the update cannot recreate it. Use
 New chat > Resume with a known native ID when importing an existing CLI chat.
 Saved terminal screens are retained when automatic recovery is not possible.
 
-Version 0.4.16 adds **OpenCode** to New chat, History and the default-agent
+Version 0.4.17 adds **Settings > Appearance > Workspace theme**. Choose Light
+for dark text on white, or System to follow your device. Dark remains the default.
+Standard HTML reports follow this preference. For a report with an independent
+visual design, merge its updated source or add `data-mak-theme="custom"` to the
+root element to preserve its palette. See [customization](customization.md).
+
+Version 0.4.16 added **OpenCode** to New chat, History and the default-agent
 setting. Install and configure OpenCode separately, then reopen Mr. Mak if the
 command was just added to PATH. Existing Codex and Claude chats keep their login
 and settings. No API key is needed for their subscription-backed CLI chats;
@@ -25,9 +31,15 @@ voice remains optional and uses a separately billed OpenAI API connection.
 
 ## Skills and source
 
-For a browser-only preview, merge the source fixes, run `npm ci`, and restart
-Vite. Version 0.4.15 fixes Markdown card links and images that could leave the
-browser view blank. Root `npm ci` also installs the local service dependencies.
+For a browser-only preview, merge the source fixes, stop your Preview server,
+then run `Setup.ps1 -Mode Preview` and reload the browser. Setup runs `npm ci`
+and starts Vite. Rust is not required for this mode. Root `npm ci` also installs
+the local service dependencies.
+
+The latest source includes a follow-up to the 0.4.15 preview fix: a shared
+stylesheet could prevent the card viewer from loading after normal setup.
+Direct HTML links still worked in that case. Updating the source fixes the
+embedded viewer; downloading an installer alone does not update Preview.
 
 An installer alone cannot add the new skills. For a clone that tracks this
 repository, ask your agent to review and merge the release's source changes.

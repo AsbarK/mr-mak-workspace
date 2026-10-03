@@ -39,6 +39,9 @@ subscription-backed CLI chats without an API key.
 - **Readable notes you can edit.** Open Markdown as a formatted document, switch
   to Edit, and save changes in the same window. Preview images, video and audio
   alongside the file tree.
+- **Choose a reading theme.** Settings > Appearance offers Dark, Light and
+  System. Light uses dark text on white across Workspace and standard reports.
+  Images keep their original colors; terminal appearance is set separately.
 - **Chats you can return to.** Pin conversations in history, reorder and color
   tabs, and see which agents are working or have a reply you have not viewed.
   Drop files or folders into a chat to insert their paths; clipboard images are
@@ -78,8 +81,8 @@ open an installed CLI and sign in with your own account.
 The installer includes the local Node service. It does not include Codex,
 Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.4.16 update notes](CHANGELOG.md) for OpenCode
-chats, session recovery and clearer subscription setup instructions. Follow the
+**Already using Mr. Mak?** Read the [0.4.17 update notes](CHANGELOG.md) for Workspace
+themes and browser preview fixes. Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.
 
@@ -91,8 +94,10 @@ powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Check
 powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Desktop
 ```
 
-For a browser preview of the reports, use `-Mode Preview`. The native desktop
-app adds managed terminals, local file operations and voice.
+For a browser preview of the reports, use `-Mode Preview` with Node.js 22.20+
+and npm. Rust and C++ Build Tools are needed only to compile the native desktop
+app; they are not required for Preview or the downloaded installer. The native
+desktop app adds managed terminals, local file operations and voice.
 See [getting started](docs/getting-started.md) for the complete setup and
 [architecture](desktop/README.md) for the source layout.
 

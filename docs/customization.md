@@ -3,6 +3,13 @@
 ## Change in Settings
 
 Use the right-hand Settings rail for the available display and behavior controls.
+Under **Appearance**, choose **Dark**, **Light** or **System** for Workspace.
+Dark is the default. Light uses dark text on white; System follows your device.
+The choice applies immediately to navigation, file previews, Markdown and
+standard reports, and is saved for the next launch. It also syncs between
+Workspace windows connected to the same local service. Browser Preview has a
+Settings button in the top bar and saves the choice in that browser.
+
 Terminal text settings and tab colors live with Chats. The Win-key shortcut is
 optional: when enabled, a single Win press returns to hidden Mr. Mak windows;
 when they are already in view, it opens Start. Win combinations remain normal.
@@ -49,10 +56,16 @@ starting a paid job. Higgsfield uses its own CLI setup and account.
 
 ## Design rules
 
-Use the shared dark report style, readable headings and consistent card spacing.
+Use the shared report style, readable headings and consistent card spacing.
+Standard HTML reports use `data-mak-report="document"` on the root element and
+follow the reader's Workspace theme. Use shared color tokens so custom sections
+remain readable. For an intentionally independent design, such as a game demo,
+add `data-mak-theme="custom"` to the root element to keep its original palette.
+Images, videos and canvases keep their colors in every theme.
+
 Every report image must open at full size and offer a download. Keep wide tables
 scrollable inside the report, and test tabs at narrow window widths. Preserve
-the document surface while a tab loads so switching does not flash white.
+the selected document surface while a tab loads so switching does not flash.
 
 The Workspace authoring skill contains the maintained rules. If you change the
 design system, update that skill and the shared implementation together.

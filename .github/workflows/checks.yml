@@ -19,6 +19,7 @@ jobs:
       - run: npm run test:template
       - run: npm run build
       - run: npm run test:preview
+      - run: node desktop/service/test/theme-ui.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

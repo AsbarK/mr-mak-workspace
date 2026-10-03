@@ -4,6 +4,7 @@ import type { Preview } from '../desktop/types'
 import MarkdownDocument, { MarkdownView } from './MarkdownDocument'
 import { ZoomImage } from './ImagePreview'
 import { downloadImage } from '../lib/download'
+import ReportFrame from './ReportFrame'
 
 export default function ReportViewer({ url, title, relativePath }: { url: string; title: string; relativePath: string }) {
   const markdown = /\.md$/i.test(relativePath)
@@ -36,7 +37,7 @@ export default function ReportViewer({ url, title, relativePath }: { url: string
   if (image) return <div className="report-image"><nav><span>{title}</span><a href={url} target="_blank" rel="noreferrer">Open original</a><a href={url} onClick={event => { event.preventDefault(); void downloadImage(url).catch(error => setError(error.message)) }}>Download</a></nav><ZoomImage src={url} alt={title} /></div>
   const ready = available && loaded
   return <div className="report-document" aria-busy={!ready}>
-    <iframe src={url} title={title} className={`report-frame${ready ? ' loaded' : ''}`} sandbox={isDesktop ? 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads' : undefined} onLoad={reveal} onError={() => setError('This page could not be loaded.')} />
+    <ReportFrame url={url} title={title} className={`report-frame${ready ? ' loaded' : ''}`} sandbox={isDesktop ? 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads' : undefined} onLoad={reveal} onError={() => setError('This page could not be loaded.')} />
     {!ready && <div className="report-loading" role="status">Opening report…</div>}
   </div>
 }

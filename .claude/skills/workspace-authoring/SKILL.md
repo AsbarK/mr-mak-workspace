@@ -14,6 +14,10 @@ Use `workspace/_shared/report.css` and `report.js` in every HTML report, with
 `data-mak-report="document"` on the root element. Use the shared tokens and
 layout instead of inventing another visual theme. Basic cards and media grids
 can use the sample CSS in `workspace/_shared/examples.css`.
+Standard reports follow the reader's Dark, Light or System preference. Check
+both dark and light when adding custom styles. An intentionally independent
+design, such as a game demo, can keep its palette with `data-mak-theme="custom"`
+on the root element. Do not invert or recolor media to implement a theme.
 
 Every image must be clickable, preview at full size and offer a download.
 Use local output paths, meaningful alt text and lazy loading. Keep motion
@@ -25,6 +29,6 @@ title, creation date, last updated date and steps. `sample: true` is reserved fo
 starter examples; ordinary work uses normal archiving behavior.
 
 Open every changed tab at wide and narrow sizes. Check media and links, Markdown
-rendering and image close/download controls. Preserve the dark surface during
+rendering and image close/download controls. Preserve the selected surface during
 loading. Report actual verification and any remaining limitations. Prepare
 desktop changes without restarting active sessions until the user permits it.
