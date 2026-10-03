@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.18 - 2026-10-04
+
+- Added Linux desktop packaging and release build automation, contributed by
+  [rluders](https://github.com/rluders) in [PR #8](https://github.com/witnesstodark/mr-mak-workspace/pull/8).
+- Added a project-adapter foundation with generic and Godot project detection,
+  metadata, relevant files and optional editor/run commands when Godot is installed.
+- Added optional Markdown knowledge sources with resolved-path boundary checks,
+  plus integration-provider foundations. No external account is connected by default.
+- Preserved Windows startup with canonical paths and OpenCode version detection,
+  command discovery and session recovery during the platform refactor.
+- Release assets now use a dedicated staging folder and explicit repository
+  selection. The browser check retains card-loading coverage without HMR.
+
+**Update:** quit Mr. Mak after active tasks finish and install the new Windows
+package. Existing projects, chat history and settings remain in place. For
+Preview or a source build, merge the update and follow [the update guide](docs/updating.md).
+Linux packaging is covered by CI; macOS build automation is included but has
+not been interactively validated. This release includes the 0.4.17 reading themes.
+
 ## 0.4.17 - 2026-10-02
 
 - Added Dark, Light and System in Settings > Appearance. Light uses dark text

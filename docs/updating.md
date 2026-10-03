@@ -7,7 +7,7 @@ context, credentials or agent conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.4.17** for Windows x64.
+2. Install **Mr. Mak Workspace 0.4.18** for Windows x64.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
@@ -17,7 +17,11 @@ deleted or belongs to another account, the update cannot recreate it. Use
 New chat > Resume with a known native ID when importing an existing CLI chat.
 Saved terminal screens are retained when automatic recovery is not possible.
 
-Version 0.4.17 adds **Settings > Appearance > Workspace theme**. Choose Light
+Version 0.4.18 adds Linux packaging and project/knowledge-provider foundations.
+Windows keeps its native terminal behavior and existing account sign-ins.
+No external integration is connected automatically.
+
+Version 0.4.17 added **Settings > Appearance > Workspace theme**. Choose Light
 for dark text on white, or System to follow your device. Dark remains the default.
 Standard HTML reports follow this preference. For a report with an independent
 visual design, merge its updated source or add `data-mak-theme="custom"` to the

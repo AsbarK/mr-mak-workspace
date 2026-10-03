@@ -81,8 +81,9 @@ open an installed CLI and sign in with your own account.
 The installer includes the local Node service. It does not include Codex,
 Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.4.17 update notes](CHANGELOG.md) for Workspace
-themes and browser preview fixes. Follow the
+**Already using Mr. Mak?** Read the [0.4.18 update notes](CHANGELOG.md) for Linux
+packaging and the project-adapter foundation, plus the existing Workspace themes.
+Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.
 
