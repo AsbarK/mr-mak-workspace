@@ -21,7 +21,7 @@ export function shellCommand(env = process.env) {
 export function commandSearchRoots(env = process.env, home = os.homedir()) {
   const roots = [];
   if (isWindows && env.APPDATA) roots.push(path.join(env.APPDATA, 'npm'));
-  roots.push(path.join(home, '.kimi-code', 'bin'), path.join(home, '.local', 'bin'));
+  roots.push(path.join(home, '.opencode', 'bin'), path.join(home, '.kimi-code', 'bin'), path.join(home, '.local', 'bin'));
   return roots;
 }
 
@@ -29,9 +29,9 @@ export function commandExtensions() {
   return isWindows ? ['.exe', '.cmd', '.bat', '.ps1', ''] : [''];
 }
 
-export function resolveCommand(name, env = process.env) {
+export function resolveCommand(name, env = process.env, home = os.homedir()) {
   if (path.isAbsolute(name) && existsSync(name)) return name;
-  for (const folder of [...String(env.PATH || env.Path || '').split(path.delimiter), ...commandSearchRoots(env, os.homedir())]) {
+  for (const folder of [...String(env.PATH || env.Path || '').split(path.delimiter), ...commandSearchRoots(env, home)]) {
     for (const ext of commandExtensions()) {
       const candidate = path.join(folder, name.toLowerCase().endsWith(ext) && ext ? name : name + ext);
       if (existsSync(candidate)) return candidate;

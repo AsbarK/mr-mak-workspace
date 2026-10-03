@@ -33,11 +33,13 @@ export class MarkdownKnowledgeProvider {
     const root = await this.rootPath();
     const needle = query.toLowerCase(); const hits = [];
     for (const file of await this.files()) {
-      const text = await readFile(file, 'utf8').catch(() => '');
+      const actual = await realpath(file).catch(() => null);
+      if (!actual || !within(root, actual) || !textFiles.has(path.extname(actual).toLowerCase())) continue;
+      const text = await readFile(actual, 'utf8').catch(() => '');
       const index = text.toLowerCase().indexOf(needle);
       if (index < 0) continue;
-      const info = await stat(file).catch(() => null);
-      hits.push({ providerId: this.id, ref: path.relative(root, file).split(path.sep).join('/'), title: titleOf(file, text), excerpt: text.slice(Math.max(0, index - 180), index + 420), source: file, modifiedAt: info?.mtime.toISOString() || null });
+      const info = await stat(actual).catch(() => null);
+      hits.push({ providerId: this.id, ref: path.relative(root, file).split(path.sep).join('/'), title: titleOf(file, text), excerpt: text.slice(Math.max(0, index - 180), index + 420), source: actual, modifiedAt: info?.mtime.toISOString() || null });
     }
     return hits.slice(0, 100);
   }

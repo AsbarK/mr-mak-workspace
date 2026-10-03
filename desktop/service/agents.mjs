@@ -5,6 +5,13 @@ import { isWindows, resolveCommand, shellCommand, shellLabel } from './platform.
 
 export { shellCommand };
 
+export function wrapCommand(file, args = []) {
+  if (!isWindows) return { file, args };
+  const quote = value => "'" + value.replaceAll("'", "''") + "'";
+  const script = `[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & ${[file, ...args].map(quote).join(' ')}; exit $LASTEXITCODE`;
+  return { file: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] };
+}
+
 export const AGENTS = [
   { id: 'codex', label: 'Codex', color: '#88d8bf', command: 'codex', subscription: true },
   { id: 'claude', label: 'Claude Code', color: '#dba68c', command: 'claude', subscription: true },
@@ -13,8 +20,8 @@ export const AGENTS = [
   { id: 'shell', label: shellLabel(), color: '#89b7ed', command: 'shell', subscription: false },
 ];
 
-export function commandPath(name, env = process.env) {
-  return resolveCommand(name, env);
+export function commandPath(name, env = process.env, home) {
+  return resolveCommand(name, env, home);
 }
 
 export function inventory(env = process.env) {
@@ -73,11 +80,8 @@ export function terminalCommand(agent, { bypass = false, resumeId, nativeId, eff
     if (bypass) args.push('--auto');
   }
   if (!isWindows || agent === 'shell') return { file: command.file || command, args: [...(command.args || []), ...args] };
-  // An encoded PowerShell script preserves spaces, Unicode and quotes. No -NoExit:
-  // after the agent exits, stale coordinator input cannot become shell commands.
-  const quote = value => "'" + value.replaceAll("'", "''") + "'";
-  const script = `[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & ${[command.file, ...(command.args || []), ...args].map(quote).join(' ')}; exit $LASTEXITCODE`;
-  return { file: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] };
+  // No -NoExit: stale coordinator input cannot become shell commands after the agent exits.
+  return wrapCommand(command.file, [...(command.args || []), ...args]);
 }
 
 export function childEnvironment(repo) {

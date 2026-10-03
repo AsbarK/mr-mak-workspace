@@ -127,6 +127,17 @@ fn repo_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Erro
     }
 }
 
+fn normalize_node_path(path: PathBuf) -> PathBuf {
+    let value = path.to_string_lossy();
+    if let Some(rest) = value.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = value.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    path
+}
+
 fn make_windows(app: &tauri::AppHandle, workspace: &str, chats: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (mut x, mut y, mut width, mut height) = (0.0, 0.0, 1440.0, 900.0);
     if let Some(monitor) = app.primary_monitor()? {
@@ -204,6 +215,7 @@ fn main() {
             } else {
                 (PathBuf::from("node"), repo.join("desktop/service/main.mjs"), repo.join("dist"))
             };
+            let script = normalize_node_path(script);
             let logs = app.path().app_log_dir()?; fs::create_dir_all(&logs)?;
             let log = fs::OpenOptions::new().create(true).append(true).open(logs.join("service.log"))?;
             let mut command = Command::new(node);
@@ -343,5 +355,18 @@ fn main() {
             }
         }),
         Err(error) => { rfd::MessageDialog::new().set_title("Mr. Mak could not start").set_description(error.to_string()).show(); }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_node_path;
+    use std::path::PathBuf;
+
+    #[test]
+    fn normalize_node_path_removes_windows_extended_prefixes() {
+        assert_eq!(normalize_node_path(PathBuf::from(r"\\?\C:\Mr Mak\service\main.mjs")), PathBuf::from(r"C:\Mr Mak\service\main.mjs"));
+        assert_eq!(normalize_node_path(PathBuf::from(r"\\?\UNC\server\share\service\main.mjs")), PathBuf::from(r"\\server\share\service\main.mjs"));
+        assert_eq!(normalize_node_path(PathBuf::from(r"C:\Mr Mak\service\main.mjs")), PathBuf::from(r"C:\Mr Mak\service\main.mjs"));
     }
 }
