@@ -127,8 +127,10 @@ jobs:
           version="${RELEASE_VERSION#v}"
           jq -n --arg version "${version}" '{version: $version}' > src-tauri/release-config.json
 
-      - name: Build DMG
-        run: npm exec -- tauri build --ci --bundles dmg --config src-tauri/release-config.json
+      # Asking only for dmg makes Tauri remove the intermediate .app, which
+      # the next step also needs for the downloadable app archive.
+      - name: Build app and DMG
+        run: npm exec -- tauri build --ci --bundles app,dmg --config src-tauri/release-config.json
 
       - name: Stage macOS assets
         run: |
