@@ -44,6 +44,22 @@ both mouse tracking and the requested SGR encoding, including saved screens,
 so switching tabs or reconnecting does not disable its mouse wheel. Classic
 Claude and Codex continue using local terminal scrollback.
 
+## Local microphone dictation
+
+Desktop chats, the Mak composer and paired mobile chats support free local Whisper
+dictation. Follow [setup and review behavior](../docs/mobile-access.md#voice-input).
+The local engine is the default. Choose Free/Paid/Off in the top-right phone
+button (**Phone settings**) or **Settings → Speech-to-text**. The choice is saved
+and shared with paired phones. Paid providers require an API key on the computer.
+
+## Terminal appearance
+
+Settings → Chats → Terminal appearance offers **Original CLI colors** (the default)
+and **Mr. Mak Focus** (muted colors). Original preserves CLI diff colors for added
+and removed lines. The choice is saved for all desktop chats and applies to open
+terminals immediately without restarting sessions. Existing saved preferences
+are retained. The same choice is available in each chat’s options menu.
+
 ## OpenCode terminals
 
 The service detects installed OpenCode 1.x or 2.x and launches its real TUI.
@@ -95,3 +111,11 @@ and 2.0.21 on Windows. No paid model calls are made.
 
 Windows x64 and Linux are supported native targets. macOS remains a future target;
 the shared platform boundary avoids making Linux behavior a prerequisite for it.
+
+Read aloud uses fixed, free local voices: Michael (US man) and Emma (UK woman).
+Run `powershell -ExecutionPolicy Bypass -File scripts/setup-local-read-aloud.ps1`
+on Windows once. Models and the CPU Python environment stay under the ignored
+`.cache/read-aloud` folder; no cloud speech key or paid account is needed.
+Phone settings stores the voice choice. The mobile service lazily starts its
+own voice worker and releases it after idle time; updating service files requires
+a user-approved application restart.

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { readFile, realpath } from 'node:fs/promises';
 import { readJson, realFile, secret, within } from './util.mjs';
+import { serveReport } from './report-chrome.mjs';
 import { serveFile } from './files.mjs';
 
 const extensions = new Set(['.html', '.htm', '.md', '.txt', '.css', '.js', '.mjs', '.json', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.mp4', '.webm', '.mp3', '.wav', '.ogg', '.pdf', '.woff', '.woff2', '.ttf', '.glb', '.gltf', '.bin', '.wasm']);
@@ -22,12 +23,14 @@ export class MobileReports {
     if (!info.isFile()) fail('Report not found', 404);
     const extension = path.extname(file).toLowerCase();
     if (!['.html', '.htm', '.md', '.txt'].includes(extension)) fail('Open this type of report on your computer.');
-    const token = secret(), prefix = `workspace/${entity.folder.replaceAll('\\', '/')}/`;
+    const prefix = `workspace/${entity.folder.replaceAll('\\', '/')}/`;
     for (const [id, grant] of this.grants) if (grant.expires < Date.now() || !this.gateway.state.devices.some(item => item.id === grant.deviceId)) this.grants.delete(id);
-    if (this.grants.size >= 100) this.grants.delete(this.grants.keys().next().value);
+    const existing = [...this.grants].find(([, grant]) => grant.deviceId === device.id && grant.root === root && grant.prefix === prefix);
+    const token = existing?.[0] || secret();
+    if (!existing && this.grants.size >= 100) this.grants.delete(this.grants.keys().next().value);
     this.grants.set(token, { root, prefix, deviceId: device.id, expires: Date.now() + 30 * 60 * 1000 });
     const url = `/mobile/view/${token}/${prefix}${relative.split(/[\\/]/).map(encodeURIComponent).join('/')}`;
-    return { title: entity.title, step: entity.steps[step].name, kind: extension === '.md' || extension === '.txt' ? 'markdown' : 'html', url, ...(extension === '.md' || extension === '.txt' ? { text: (await readFile(file, 'utf8')).slice(0, 2 * 1024 * 1024) } : {}) };
+    return { statePersistence: true, title: entity.title, step: entity.steps[step].name, kind: extension === '.md' || extension === '.txt' ? 'markdown' : 'html', url, ...(extension === '.md' || extension === '.txt' ? { text: (await readFile(file, 'utf8')).slice(0, 2 * 1024 * 1024) } : {}) };
   }
   async serve(request, response, url) {
     const gateway = this.gateway;
@@ -46,10 +49,11 @@ export class MobileReports {
     const base = `${gateway.origin}/mobile/view/${match[1]}/`;
     // A report is an opaque sandbox with access only to this short-lived folder grant.
     // It has no same-origin privileges, desktop token, device cookie or mobile API access.
-    await serveFile(request, response, file, info, {
+    const html = /\.html?$/i.test(file) && url.searchParams.get('download') !== '1';
+    await (html ? serveReport : serveFile)(request, response, file, info, {
       'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'Access-Control-Allow-Origin': '*',
       ...(url.searchParams.get('download') === '1' ? { 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(file))}` } : {}),
       'Content-Security-Policy': `sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'unsafe-inline' ${base}; style-src 'unsafe-inline' ${base}; img-src data: blob: ${base}; media-src blob: ${base}; font-src data: ${base}; connect-src ${base}; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${gateway.origin}`,
-    });
+    }, { parentOrigin: gateway.origin, mobileState: true });
   }
 }

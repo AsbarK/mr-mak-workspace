@@ -3,6 +3,15 @@
 ## Unreleased
 
 - Start agent chats and the terminal through the full Windows PowerShell path, so they still open when PowerShell's folder is missing from PATH.
+- Use fixed local Michael (US male) and Emma (UK female) voices for mobile Read aloud instead of browser voice lists.
+
+- Open shared images in a full-screen viewer with image-only pinch zoom/pan, and read agent replies aloud using available device voices.
+
+- Show shared conversation images on mobile with an enlarged preview and downloads through paired, scoped image access.
+
+- Mobile Recent activity starts collapsed and expands with a tap, keeping conversation messages in view.
+
+- Add free local Whisper dictation on desktop and mobile, shared Free/Paid provider settings in Phone settings, and direct desktop terminal insertion without automatic submission. Default terminal appearance to Original CLI colors.
 
 ## 0.5.1 - 2026-10-09
 
