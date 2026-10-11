@@ -10,7 +10,7 @@ const invalid = message => Object.assign(new Error(message), { status: 400 });
 export async function importFile(source, folder, name, maxBytes = MAX_FILE_BYTES) {
   if (typeof folder !== 'string' || !folder) throw invalid('Choose a destination folder.');
   if (invalidFilename(name)) {
-    throw invalid('This file name cannot be used on Windows.');
+    throw invalid('This file name cannot be used on this computer.');
   }
   const destination = await realpath(path.resolve(folder));
   if (!(await stat(destination)).isDirectory()) throw invalid('Choose a folder to copy files into.');
@@ -75,7 +75,7 @@ export async function moveFile(value, folder) {
   const target = path.join(destination, path.basename(source));
   if (samePath(source, target)) return { path: source, moved: false };
   const before = await lstat(source);
-  if (!before.isFile() || before.isSymbolicLink()) throw invalid('Move individual files here. Use Explorer for folder or link moves.');
+  if (!before.isFile() || before.isSymbolicLink()) throw invalid('Move individual files here. Use your file manager for folder or link moves.');
   try {
     // A same-volume hard link is an exclusive, constant-time move reservation.
     // Neither this path nor the cross-volume fallback can overwrite another file.

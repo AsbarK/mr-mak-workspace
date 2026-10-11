@@ -52,6 +52,10 @@ pub fn reveal_path(path: &str) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
+        // Finder can select the file itself; xdg-open can only open its folder.
+        if cfg!(target_os = "macos") && !target.is_dir() {
+            return Command::new("open").arg("-R").arg(target).spawn().map(|_| ()).map_err(|error| format!("Could not open Finder: {error}"));
+        }
         let folder = if target.is_dir() { target } else { target.parent().unwrap_or(target) };
         let program = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
         Command::new(program).arg(folder).spawn().map(|_| ()).map_err(|error| format!("Could not start {program}: {error}"))

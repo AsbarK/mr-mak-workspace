@@ -13,6 +13,11 @@ export class TailscaleTransport {
       const installed = path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Tailscale', 'tailscale.exe');
       try { await access(installed); executable = installed; } catch { /* Try PATH. */ }
     }
+    if (process.platform === 'darwin') {
+      // The Mac App Store / standalone Tailscale app does not put its CLI on PATH by default.
+      const installed = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+      try { await access(installed); executable = installed; } catch { /* Try PATH. */ }
+    }
     return execute(executable, args, { windowsHide: true, timeout: 12000, maxBuffer: 1024 * 1024 });
   }
   async probe() {

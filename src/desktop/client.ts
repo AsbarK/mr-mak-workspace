@@ -29,8 +29,9 @@ export const dismissError = () => update({ error: null })
 export const reportError = (error: unknown) => update({ error: error instanceof Error ? error.message : String(error) })
 export const contentUrl = (relative: string) => isDesktop ? `${state.contentBase}${relative}` : relative
 
-export async function api<T>(path: string, data?: unknown, method?: string): Promise<T> {
+export async function api<T>(path: string, data?: unknown, method?: string, options: { keepalive?: boolean } = {}): Promise<T> {
   const response = await fetch(`/api${path}`, {
+    ...options,
     method: method || (data === undefined ? 'GET' : 'POST'),
     headers: { Authorization: `Bearer ${token}`, ...(data === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: data === undefined ? undefined : JSON.stringify(data),
