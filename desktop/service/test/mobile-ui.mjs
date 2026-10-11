@@ -299,9 +299,11 @@ try {
   const videoPreview = phone.getByRole('dialog', { name: 'Shared video preview' });
   await videoPreview.waitFor();
   const player = videoPreview.locator('video');
-  await expect.poll(() => player.evaluate(video => video.readyState)).toBeGreaterThanOrEqual(2);
+  // Safari respects preload="metadata" and does not decode a frame until play.
+  await expect.poll(() => player.evaluate(video => video.readyState)).toBeGreaterThanOrEqual(1);
   assert.equal(await player.evaluate(video => video.controls && video.playsInline), true);
   await player.evaluate(video => video.play());
+  await expect.poll(() => player.evaluate(video => video.readyState)).toBeGreaterThanOrEqual(2);
   await expect.poll(() => player.evaluate(video => video.currentTime)).toBeGreaterThan(0);
   await player.evaluate(video => { video.pause(); video.currentTime = 0.2; });
   await expect.poll(() => player.evaluate(video => video.currentTime)).toBeGreaterThanOrEqual(0.19);

@@ -89,7 +89,9 @@ service-worker requests, and two timing races).
 ## Known limits / not tested
 - Unsigned, Apple Silicon only (`aarch64`); no notarisation. An Intel or universal build needs
   `--target universal-apple-darwin` and both Rust targets.
-- Voice needs `OPENAI_API_KEY` in the ignored `.env`; the real microphone prompt was not exercised.
+- The Live voice coordinator needs `OPENAI_API_KEY` in the ignored `.env`.
+  Dictation can use optional local Whisper instead. The real microphone permission
+  prompt was not exercised in the contributor's native checks.
 - Mobile access over Tailscale was only tested in automation (WebKit = iPhone Safari's engine),
   not with a real phone.
 - The tray (menu-bar) menu is not reachable through Accessibility, so it is not in the native checks.

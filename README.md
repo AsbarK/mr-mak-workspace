@@ -39,11 +39,14 @@ to see it at full size. Sample conversations shown.*
   Phone and desktop can show different chats while sharing the conversation.
 - **Speak a draft.** Tap the microphone, record your message and stop to
   transcribe it. Review the text before pressing Send.
+- **Review the result.** Enlarge shared images, play videos, or reopen a report
+  at its saved position. Optional local voices can read a reply aloud.
 
 Keep the computer awake with Mr. Mak running, and Tailscale connected on both
-devices. The microphone button uses separately billed OpenRouter or OpenAI API
-credit; its key stays on your computer. Typing and your phone keyboard's own
-dictation need no Mr. Mak transcription key.
+devices. Dictation can run locally with Whisper after the optional Python setup,
+or use separately billed OpenRouter/OpenAI API credit. Updates keep your current
+provider. Local dictation and Read aloud require no transcription API key;
+the optional Live voice coordinator still uses OpenAI API billing.
 
 [Set up mobile access and voice input](docs/mobile-access.md)
 
@@ -211,8 +214,9 @@ and save workflows in `processes/`. English is the default for stored content;
 ask for another language whenever you need it. The app's Win-key shortcut and
 permission bypass both start disabled.
 
-This release targets **Windows x64 and Linux**. Browser report previews can run
-elsewhere; macOS native packaging remains future work. See [customization](docs/customization.md) and
+Desktop source builds support **Windows x64, Linux and macOS**. The Mac app is
+unsigned; see the [macOS setup and limitations](docs/macos.md) before installing.
+See [customization](docs/customization.md) and
 [sharing your version](docs/sharing.md).
 
 Application code and original workflow documentation are under the MIT license.
