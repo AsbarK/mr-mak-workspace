@@ -205,3 +205,9 @@ images are skipped. Playback starts only after a tap and stops when changing
 chats, opening Terminal or leaving Conversation.
 
 Voice definitions: [Kokoro voice catalogue](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).
+
+Returning from phone sleep immediately replaces the stale connection without
+reloading the app. The current view, selected chat, draft and scroll position stay
+in place. Online and restored-page events use the same recovery; old bootstrap
+replies are ignored, connection attempts have a deadline, and failed attempts
+retry while the app is visible. The nose button reconnects in place as well.

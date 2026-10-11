@@ -89,6 +89,15 @@ try {
       createBufferSource() { return { connect() {}, start() { window.testSpeech.current = { onend: () => this.onended?.() }; } }; }
     } });
   });
+  await mobileContext.addInitScript(() => {
+    const NativeSocket = window.WebSocket;
+    window.testConnections = []; window.testDelayedSockets = [];
+    window.WebSocket = class extends NativeSocket {
+      constructor(...args) { super(...args); window.testConnections.push(this); }
+      close(...args) { if (window.testDelayClose) { window.testDelayedSockets.push(this); return; } super.close(...args); }
+    };
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.testVisibility || 'visible' });
+  });
   const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000); phone.on('pageerror', error => errors.push(error.message));
   // Open from another site like a QR scanner, rather than an address-bar visit.
   qrSource = http.createServer((_request, response) => {
@@ -114,7 +123,7 @@ try {
   await desktop.getByRole('button', { name: 'Connect phone', exact: true }).click();
   await phone.getByRole('heading', { name: 'Chats', exact: true }).waitFor();
   await desktop.getByText('Connected now', { exact: true }).waitFor();
-  assert.deepEqual(await phone.locator('.mobile-header button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['Refresh page', 'New chat', 'History', 'Chats', 'Results', 'Phone settings']);
+  assert.deepEqual(await phone.locator('.mobile-header button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['Reconnect', 'New chat', 'History', 'Chats', 'Results', 'Phone settings']);
   await phone.getByRole('button', { name: 'History', exact: true }).click();
   await phone.getByRole('heading', { name: 'History', exact: true }).waitFor();
   assert.deepEqual(await phone.locator('.mobile-main-nav button.active').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['History']);
@@ -127,7 +136,10 @@ try {
   await phone.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await phone.locator('.mobile-connection-logo').evaluate(dot => getComputedStyle(dot).animationName), 'none');
   await phone.emulateMedia({ reducedMotion: 'no-preference' });
-  await Promise.all([phone.waitForEvent('load'), phone.getByRole('button', { name: 'Refresh page', exact: true }).click()]);
+  const documentIdentity = await phone.evaluate(() => { window.testDocumentIdentity = Math.random(); return window.testDocumentIdentity; });
+  await phone.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await phone.waitForFunction(() => !document.querySelector('.mobile-offline'));
+  assert.equal(await phone.evaluate(() => window.testDocumentIdentity), documentIdentity, 'Reconnect never reloads the document');
   await phone.getByRole('heading', { name: 'Chats', exact: true }).waitFor();
   for (const width of [320, 360, 393, 430, 768]) {
     await phone.setViewportSize({ width, height: 844 });
@@ -264,6 +276,28 @@ try {
   await modeButtons.getByRole('button', { name: 'Terminal', exact: true }).click();
   assert.equal(await phone.evaluate(() => window.testSpeech.current), null, 'Opening terminal stops speech');
   await modeButtons.getByRole('button', { name: 'Conversation', exact: true }).click();
+  const draftBeforeWake = 'Keep my draft while the phone sleeps.';
+  await phone.getByRole('textbox', { name: 'Message' }).fill(draftBeforeWake);
+  const beforeWake = await phone.evaluate(() => ({ sockets: window.testConnections.length, identity: window.testDocumentIdentity, scroll: document.querySelector('.mobile-messages').scrollTop }));
+  let heldBootstrap, holdNextBootstrap = true;
+  await phone.route('**/mobile/api/bootstrap', route => { if (holdNextBootstrap) { holdNextBootstrap = false; heldBootstrap = route; } else return route.continue(); });
+  await phone.evaluate(() => { window.testDelayClose = true; });
+  await phone.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await expect.poll(() => !!heldBootstrap).toBeTruthy();
+  const wakeStarted = Date.now();
+  await phone.evaluate(() => {
+    window.testDelayClose = true; window.testVisibility = 'hidden'; document.dispatchEvent(new Event('visibilitychange'));
+    window.testVisibility = 'visible'; document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pageshow'));
+  });
+  await phone.waitForFunction(count => window.testConnections.length > count && !document.querySelector('.mobile-offline'), beforeWake.sockets);
+  assert.ok(Date.now() - wakeStarted < 2500, 'Wake reconnect starts immediately, without the retry delay');
+  assert.equal(await phone.evaluate(() => window.testDocumentIdentity), beforeWake.identity);
+  await expect(phone.getByRole('textbox', { name: 'Message' })).toHaveValue(draftBeforeWake);
+  assert.equal(await phone.locator('.mobile-terminal').count(), 0, 'Conversation mode stays selected');
+  assert.equal(await phone.evaluate(() => document.querySelector('.mobile-messages').scrollTop), beforeWake.scroll);
+  await heldBootstrap.abort().catch(() => {}); await phone.unroute('**/mobile/api/bootstrap');
+  await phone.evaluate(() => { window.testDelayClose = false; for (const socket of window.testDelayedSockets) socket.close(); window.testDelayedSockets = []; });
+  await phone.getByRole('textbox', { name: 'Message' }).fill('');
   const recentActivity = phone.locator('.mobile-tool-activity');
   await recentActivity.waitFor();
   await expect(recentActivity).not.toHaveAttribute('open', '');

@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { AgentLogo, Icon, Nose } from '../desktop/Icons'
 import type { ChatSession } from '../desktop/types'
 import { chatActivityLabel } from '../desktop/chatActivity'
-import { chooseMobileDictation, disconnectMobile, mobileApi, mobileEvent, onMobileEvent, selectMobileChat, startMobile, useMobile } from './client'
+import { chooseMobileDictation, disconnectMobile, mobileApi, mobileEvent, reconnectMobile, onMobileEvent, selectMobileChat, startMobile, useMobile } from './client'
 import Terminal from './Terminal'
 import Composer from './Composer'
 import ConversationImages from './ConversationImages'
@@ -153,7 +153,8 @@ export default function MobileApp() {
   function refreshPage() {
     if (refreshTimer.current !== undefined) return
     setRefreshing(true)
-    refreshTimer.current = window.setTimeout(() => window.location.reload(), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180)
+    void reconnectMobile()
+    refreshTimer.current = window.setTimeout(() => { setRefreshing(false); refreshTimer.current = undefined }, 500)
   }
   useEffect(() => {
     document.title = 'Mr. Mak Mobile'; document.documentElement.dataset.makTheme = 'dark'
@@ -185,7 +186,7 @@ export default function MobileApp() {
   const title = view === 'chat' && session ? session.name : view === 'results' ? 'Workspace' : history ? 'History' : 'Chats'
   return <div className="mobile-app"><header className={`mobile-header ${view === 'chat' ? 'mobile-header-chat' : ''}`}>
     {view === 'chat' && <button className="mobile-icon" aria-label="Back to chats" onClick={() => setView('list')}><Icon name="back" /></button>}
-    <button className={`mobile-nose-refresh ${refreshing ? 'refreshing' : ''}`} aria-label="Refresh page" title="Refresh page" onClick={refreshPage} disabled={refreshing}><span className={`mobile-connection-logo ${state.connected ? 'online' : ''}`} role="status" aria-label={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'} title={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'}><Nose size={26} /></span></button>
+    <button className={`mobile-nose-refresh ${refreshing ? 'refreshing' : ''}`} aria-label="Reconnect" title="Reconnect without leaving this page" onClick={refreshPage} disabled={refreshing}><span className={`mobile-connection-logo ${state.connected ? 'online' : ''}`} role="status" aria-label={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'} title={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'}><Nose size={26} /></span></button>
     <div className="mobile-header-title" ref={setResultsHeader} id={view === 'results' ? 'mobile-results-header' : undefined}>{view !== 'results' && <h1>{title}</h1>}{view === 'list' && <span className="mobile-header-count" aria-label={`${items.length} ${items.length === 1 ? 'chat' : 'chats'}`}>· {items.length}</span>}</div>
     {view === 'chat' && session?.open && <button className="mobile-icon" aria-label="Close chat" title="Close chat" disabled={!state.connected || closing} onClick={() => void closeChat()}><Icon name="trash" size={19} /></button>}
     <nav className="mobile-main-nav" aria-label="Mobile sections">
