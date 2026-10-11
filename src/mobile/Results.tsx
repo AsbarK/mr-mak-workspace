@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { Icon } from '../desktop/Icons'
 import { mobileApi, onMobileEvent } from './client'
 import { reportPosition, saveReportPosition, selectMobileWorkspace, useMobileWorkspace, validReportPosition } from './app-state'
+import { rememberMobileReport, rememberMobileReports } from './workspace-context'
 
 interface Report { id: string; title: string; category: string; updated: string; steps: { name: string; index: number }[] }
 interface Preview { title: string; step: string; kind: 'markdown' | 'html'; url: string; text?: string; statePersistence?: boolean }
@@ -34,6 +35,7 @@ export default function Results({ header, active }: { header: HTMLElement | null
     let current = true
     const load = () => mobileApi<Report[]>('/reports').then(value => {
       if (!current) return
+      rememberMobileReports(value)
       setReports(value)
       const saved = selection.id && value.find(item => item.id === selection.id)
       if (selection.id && !saved) selectMobileWorkspace(null)
@@ -45,7 +47,7 @@ export default function Results({ header, active }: { header: HTMLElement | null
   useEffect(() => {
     if (!selectedId) return
     let current = true
-    mobileApi<Preview>('/reports/open', { entityId: selectedId, step }).then(value => { if (current) { setOpened({ id: selectedId, step, value, url: restoredReportUrl(value, selectedId, step), at: Date.now() }); setError('') } }).catch(err => { if (current) setError(err instanceof Error ? err.message : String(err)) })
+    mobileApi<Preview>('/reports/open', { entityId: selectedId, step }).then(value => { if (current) { rememberMobileReport(selectedId, step, value); setOpened({ id: selectedId, step, value, url: restoredReportUrl(value, selectedId, step), at: Date.now() }); setError('') } }).catch(err => { if (current) setError(err instanceof Error ? err.message : String(err)) })
     return () => { current = false }
   }, [selectedId, step]) // Registry refreshes preserve the active report document.
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function Results({ header, active }: { header: HTMLElement | null
     const refresh = async () => {
       if (!active || refreshing || Date.now() - opened.at < 25 * 60 * 1000) return
       refreshing = true
-      try { const value = await mobileApi<Preview>('/reports/open', { entityId: selectedId, step }); if (current) { setOpened({ id: selectedId, step, value, url: value.url === opened.value.url ? opened.url : restoredReportUrl(value, selectedId, step), at: Date.now() }); setError('') } }
+      try { const value = await mobileApi<Preview>('/reports/open', { entityId: selectedId, step }); if (current) { rememberMobileReport(selectedId, step, value); setOpened({ id: selectedId, step, value, url: value.url === opened.value.url ? opened.url : restoredReportUrl(value, selectedId, step), at: Date.now() }); setError('') } }
       catch { if (current) setError('Reconnect to refresh this report. Your saved page and position are kept.') }
       finally { refreshing = false }
     }
@@ -68,7 +70,7 @@ export default function Results({ header, active }: { header: HTMLElement | null
     const message = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || event.origin !== 'null' || !prefix) return
       if (event.data?.type === 'mrmak:report-ready') { frame.current?.contentWindow?.postMessage({ type: 'mrmak:report-restore', state: reportPosition(id, step) }, '*'); return }
-      if (event.data?.type !== 'mrmak:report-state' || !active) return
+      if (event.data?.type !== 'mrmak:report-state') return
       const state = validReportPosition(event.data.state)
       if (state && state.path && state.path.startsWith(prefix.slice(1))) saveReportPosition(id, step, { ...state, path: state.path.slice(prefix.length - 1) })
     }

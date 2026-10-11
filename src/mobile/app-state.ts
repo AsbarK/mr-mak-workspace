@@ -34,6 +34,7 @@ function initialWorkspace(): WorkspaceSelection {
 }
 let workspaceSelection = initialWorkspace()
 const workspaceListeners = new Set<() => void>()
+export function mobileWorkspaceSelection() { return workspaceSelection }
 export function useMobileWorkspace() { return useSyncExternalStore(listener => { workspaceListeners.add(listener); return () => { workspaceListeners.delete(listener) } }, () => workspaceSelection) }
 export function selectMobileWorkspace(id: string | null, step?: number) { const lastStep = id ? read(`mrmak.mobile.report-step.${id}`) : null; step = step ?? (typeof lastStep === 'number' && Number.isInteger(lastStep) && lastStep >= 0 ? lastStep : 0); if (id) save(`mrmak.mobile.report-step.${id}`, step); workspaceSelection = { id, step }; save(workspaceKey, workspaceSelection); workspaceListeners.forEach(listener => listener()) }
 export function reportPosition(id: string, step: number): ReportPosition {

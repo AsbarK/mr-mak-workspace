@@ -538,6 +538,51 @@ try {
   assert.equal(await frame.locator('body').evaluate(() => location.hash), '#chapter-two');
   assert.equal(await frame.locator('#nested-scroll').evaluate(node => node.scrollTop), 180);
 
+  // Attach navigation only, freeze it for retries, and keep the transcript readable.
+  const contextRoute = `**/mobile/api/sessions/${ids[1]}/send`, contextPayloads = [];
+  await phone.route(contextRoute, async route => { contextPayloads.push(route.request().postDataJSON()); await route.fetch(); await route.abort('failed'); });
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await input.fill('Adjust this section when I ask.');
+  const contextBefore = writes.length;
+  await phone.getByRole('button', { name: 'Send', exact: true }).click();
+  await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  const deliveredContext = contextPayloads[0].text;
+  const contextMetadata = text => JSON.parse(/\n(\{[^\n]+\})\n<\/mrmak_workspace_context>$/.exec(text)[1]);
+  assert.deepEqual(contextMetadata(deliveredContext).workspace, { id: 'mobile-report', tabIndex: 0, title: 'A useful report', tab: 'Report', currentViewerPage: 'workspace/report/index.html', sectionAnchor: '#chapter-two' });
+  assert.match(deliveredContext, /Do not read, open, or investigate this Workspace merely because this note is attached/);
+  assert.ok(!deliveredContext.includes('/mobile/view/') && !deliveredContext.includes('Report ready'), 'No grant URL or report content is copied');
+  await phone.getByRole('button', { name: 'Results', exact: true }).click();
+  await phone.getByLabel('Select report page', { exact: true }).click();
+  await phone.getByRole('button', { name: 'Plan', exact: true }).click(); await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click(); await phone.reload();
+  await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  await phone.unroute(contextRoute);
+  await phone.route(contextRoute, async route => { contextPayloads.push(route.request().postDataJSON()); await route.continue(); });
+  await phone.getByRole('button', { name: 'Retry', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
+  assert.equal(writes.length - contextBefore, 2, 'Changed Workspace and reload do not duplicate delivery');
+  assert.deepEqual(contextPayloads[1], contextPayloads[0], 'A retry retains the exact original context');
+  await input.fill('Now use the Plan tab.');
+  const planBefore = writes.length; await phone.getByRole('button', { name: 'Send', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
+  assert.equal(contextMetadata(contextPayloads.at(-1).text).workspace.tab, 'Plan');
+  assert.equal(contextMetadata(contextPayloads.at(-1).text).workspace.reportEntryPage, 'workspace/report/plan.md');
+  assert.equal(contextMetadata(contextPayloads.at(-1).text).workspace.sectionAnchor, undefined, 'Another tab never inherits an old section');
+  assert.equal(writes.length - planBefore, 2);
+  await phone.unroute(contextRoute);
+  const contextReader = service.mobile.transcripts.read;
+  service.mobile.transcripts.read = async () => ({ supported: true, messages: [{ id: 'context-user', role: 'user', text: deliveredContext, at: new Date().toISOString() }, { id: 'context-assistant', role: 'assistant', text: 'Ready when you ask.', at: new Date().toISOString() }] });
+  await expect(phone.locator('.mobile-message.user .mobile-message-copy')).toHaveCount(1);
+  await expect(phone.locator('.mobile-message.user .mobile-message-copy')).toHaveText('Adjust this section when I ask.');
+  await phone.getByRole('button', { name: 'Read aloud', exact: true }).click();
+  await phone.waitForFunction(() => window.testSpeech.spoken.at(-1)?.text.includes('Ready when you ask.'));
+  assert.ok(!await phone.evaluate(() => window.testSpeech.spoken.at(-1).text.includes('Workspace')));
+  await phone.getByRole('button', { name: 'Stop reading', exact: true }).click();
+  service.mobile.transcripts.read = contextReader;
+  await phone.getByRole('button', { name: 'Results', exact: true }).click();
+  await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  await phone.getByLabel('Select report page', { exact: true }).click();
+  await phone.getByRole('button', { name: 'Report', exact: true }).click();
+  await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
+
   await phone.getByLabel('Select report page', { exact: true }).click();
   await phone.getByRole('button', { name: 'Plan', exact: true }).click(); await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
   await phone.locator('.mobile-report-markdown').evaluate(node => { node.scrollTop = 350; node.dispatchEvent(new Event('scroll')); });
@@ -566,6 +611,26 @@ try {
   await phone.getByLabel('Select report page', { exact: true }).click();
   await phone.getByRole('button', { name: 'Close report', exact: true }).click();
   await phone.getByRole('heading', { name: 'Workspace', exact: true }).waitFor();
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await input.fill('There is no selected Workspace now.');
+  const clearedBefore = writes.length;
+  await phone.getByRole('button', { name: 'Send', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
+  assert.equal(contextMetadata(writes[clearedBefore].data.replace(/\x1b\[20[01]~/g, '')).workspace, null, 'Closing a report clears the current context');
+  const slashBefore = writes.length; await input.fill('/status');
+  await phone.getByRole('button', { name: 'Send', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
+  assert.equal(writes[slashBefore].data, '\x1b[200~/status\x1b[201~', 'Native slash commands are unchanged');
+  // A pending draft from before this update must retry its original plain text.
+  const legacyRequest = { requestId: randomUUID(), text: 'An older pending draft.', images: [] };
+  const legacyBefore = writes.length;
+  await phone.evaluate(async ({ id, data }) => {
+    const response = await fetch(`/mobile/api/sessions/${id}/send`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Legacy fixture delivery failed');
+    localStorage.setItem(`mrmak.mobile.draft.${id}`, JSON.stringify(data));
+  }, { id: ids[1], data: legacyRequest });
+  await phone.reload(); await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  await phone.getByRole('button', { name: 'Retry', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
+  assert.equal(writes.length - legacyBefore, 2, 'Pre-update pending drafts remain compatible with delivery receipts');
+  assert.equal(writes[legacyBefore].data, '\x1b[200~An older pending draft.\x1b[201~');
   // Close the selected desktop chat from the phone, then resume it from History.
   // Only the launch is stubbed; closing/persistence/selection use the real service.
   await phone.getByRole('button', { name: 'Chats', exact: true }).click();
@@ -601,7 +666,7 @@ try {
   await phone.getByRole('heading', { name: 'Start in Mr. Mak Chats' }).waitFor();
   assert.equal(service.sessions.get(ids[0]).status, 'running'); assert.equal(service.sessions.get(ids[1]).status, 'running');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, fixture: repo, checks: ['QR + desktop approval', 'independent views and PTY sizes', 'microphone permission / record / stop / cancel', 'dictation never auto-sends', 'saved recording recovery after reload and chat switch', 'lost transcription reply reuses provider result', 'lost reply / retry once', 'drafts per chat', 'offline recovery', 'image attachment', 'sandboxed report + image download', 'Markdown preview', 'long-link chat cards at 320/360/393/430/768px', '360/390/768px report layout', 'four terminal arrows and touch targets', 'close confirmation / desktop tab sync / History resume / draft retention', 'device revocation'] }));
+  console.log(JSON.stringify({ ok: true, fixture: repo, checks: ['Workspace context follows card/tab/page and section', 'navigation-only references; no report content or grant URLs', 'context frozen across lost reply, page change and reload', 'automatic context excluded from display and read aloud', 'cleared selection, slash commands and pre-update pending drafts', 'QR + desktop approval', 'independent views and PTY sizes', 'microphone permission / record / stop / cancel', 'dictation never auto-sends', 'saved recording recovery after reload and chat switch', 'lost transcription reply reuses provider result', 'lost reply / retry once', 'drafts per chat', 'offline recovery', 'image attachment', 'sandboxed report + image download', 'Markdown preview', 'long-link chat cards at 320/360/393/430/768px', '360/390/768px report layout', 'four terminal arrows and touch targets', 'close confirmation / desktop tab sync / History resume / draft retention', 'device revocation'] }));
 } finally {
   if (qrSource) await new Promise(resolve => qrSource.close(resolve));
   await browser?.close(); for (const session of service.sessions.items.values()) session.process = null;

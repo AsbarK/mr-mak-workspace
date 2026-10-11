@@ -232,3 +232,17 @@ restore their saved route, window and nested scroll positions after reopening
 through an origin-checked, scroll-only sandbox message bridge. Terminal mode
 also remembers its scrollback line and fit setting. Use All workspaces to return
 to the card list; tapping Workspace itself never closes the selected report.
+
+Each mobile message to an agent includes a small reference to the selected
+Workspace card and report tab. It includes the viewer page and section anchor
+when the report bridge has reported them; older services supply only the report
+entry page. These are viewer references, not filesystem paths. Report content is
+not copied or read to build this note. The note says this is the current Workspace
+where you are working and tells the agent to read, open or investigate it only
+when your request asks for it. Clearing the Workspace selection sends a null
+reference so an earlier card is no longer treated as current.
+
+Delivery retries retain the original Workspace reference, even after switching
+pages or reloading. The automatic note stays in the native agent transcript,
+while mobile displays and reads aloud your original message. Shell input and
+native slash commands are sent unchanged. Desktop messages remain independent.

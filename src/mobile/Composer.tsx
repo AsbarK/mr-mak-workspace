@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../desktop/Icons'
 import { mobileApi, uploadMobileImage, useMobile } from './client'
 import VoiceInput from './VoiceInput'
+import { messageWithWorkspaceContext } from './workspace-context'
 
-interface Draft { text: string; images: { id: string; name: string }[]; requestId?: string; voiceIds?: string[] }
+interface Draft { text: string; images: { id: string; name: string }[]; requestId?: string; voiceIds?: string[]; deliveryText?: string }
 interface Receipt { status: 'delivered' | 'sending' | 'uncertain' | 'failed'; error?: string }
 export default function Composer({ id, connected, running, active = true }: { id: string; connected: boolean; running: boolean; active?: boolean }) {
   const storage = `mrmak.mobile.draft.${id}`
@@ -11,14 +12,14 @@ export default function Composer({ id, connected, running, active = true }: { id
   const [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [status, setStatus] = useState(''), [uncertain, setUncertain] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
   const [voiceBusy, setVoiceBusy] = useState(false)
-  const { dictation } = useMobile()
+  const { dictation, sessions } = useMobile()
   useEffect(() => { localStorage.setItem(storage, JSON.stringify(draft)) }, [draft, storage])
   async function send() {
     if (busy || uploading || voiceBusy || !connected || !running || (!draft.text.trim() && !draft.images.length)) return
-    const pending = { ...draft, requestId: draft.requestId || crypto.randomUUID() }
+    const pending = draft.requestId ? draft : { ...draft, requestId: crypto.randomUUID(), deliveryText: messageWithWorkspaceContext(draft.text, sessions.find(session => session.id === id)?.agent) }
     setDraft(pending); localStorage.setItem(storage, JSON.stringify(pending)); setBusy(true); setStatus('Delivering…')
     try {
-      const receipt = await mobileApi<Receipt>(`/sessions/${id}/send`, { requestId: pending.requestId, text: pending.text, images: pending.images.map(image => image.id) })
+      const receipt = await mobileApi<Receipt>(`/sessions/${id}/send`, { requestId: pending.requestId, text: pending.deliveryText ?? pending.text, images: pending.images.map(image => image.id) })
       if (receipt.status === 'delivered') { setDraft({ text: '', images: [] }); setStatus('Delivered to terminal'); setUncertain(false) }
       else { setStatus(receipt.error || 'Delivery is still being checked.'); setUncertain(receipt.status === 'uncertain' || receipt.status === 'failed') }
     } catch (error) { setStatus(`${error instanceof Error ? error.message : String(error)} Your draft is saved. Retry checks the same delivery.`) }
