@@ -1,6 +1,5 @@
 // Two independent browser clients, a local test transport and stub CLI processes.
 // No personal conversations, paid requests or Tailscale configuration are touched.
-import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { cp, copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
@@ -9,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createService } from '../server.mjs';
 import { MobileDictation } from '../mobile-dictation.mjs';
+import { launchBrowser, testBrowser } from './browser.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 await mkdir(path.join(root, '.cache'), { recursive: true });
@@ -32,6 +32,26 @@ const dictation = new MobileDictation(repo, { env: { OPENROUTER_API_KEY: 'test-v
 } });
 const service = await createService({ repo, uiDir: path.join(repo, 'ui'), mobileOptions: { transport, dictation }, mcpOptions: { home: repo, env: {} } });
 service.sessions.beginDiscovery = () => {};
+// Lost replies: the server handles the request, then the connection drops before
+// the reply. The phone's requests pass through its service worker, which
+// Playwright's WebKit cannot route, so WebKit simulates this on the server.
+const dropReplies = new Set(); let dropHooked = false;
+async function loseNextReply(page, part) {
+  if (testBrowser === 'webkit') {
+    // The phone talks to the mobile server, which starts when mobile access is enabled.
+    if (!dropHooked) {
+      dropHooked = true;
+      service.mobile.server.prependListener('request', (request, response) => {
+        const match = [...dropReplies].find(item => request.url.includes(item));
+        if (match) { dropReplies.delete(match); response.end = () => { request.socket.destroy(); return response; }; }
+      });
+    }
+    dropReplies.add(part); return;
+  }
+  // Chromium transparently retries a POST whose connection drops, so it keeps page.route.
+  await page.route(`**${part}`, async route => { await route.fetch(); await route.abort('failed'); });
+}
+const restoreReplies = (page, part) => testBrowser === 'webkit' ? undefined : page.unroute(`**${part}`);
 const writes = [], ids = [randomUUID(), randomUUID()];
 for (const [index, id] of ids.entries()) {
   const session = service.sessions.make({ id, name: index ? 'Research ideas' : 'Game animations', agent: index ? 'claude' : 'codex', status: 'running', open: true, pinned: !index, cols: 100, rows: 28, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), cwd: repo });
@@ -47,7 +67,7 @@ service.mobile.transcripts.read = async session => ({ supported: true, messages:
 ] });
 let browser, qrSource;
 try {
-  browser = await chromium.launch({ headless: true, channel: process.env.MRMAK_TEST_BROWSER || 'msedge', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  browser = await launchBrowser({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const desktop = await browser.newPage({ viewport: { width: 640, height: 860 } }); desktop.setDefaultTimeout(12000);
   const errors = []; desktop.on('pageerror', error => errors.push(error.message));
   await desktop.goto(service.urls.chats); await desktop.getByRole('button', { name: 'Mobile access', exact: true }).click();
@@ -64,11 +84,18 @@ try {
   await desktop.screenshot({ path: path.join(repo, 'desktop-pairing.png') });
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   await mobileContext.addInitScript(() => {
-    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    // Patch the prototype (WebKit ignores an own-property override). Chromium uses its
+    // fake capture device; headless WebKit has none, so fall back to a synthetic tone.
+    const original = MediaDevices.prototype.getUserMedia;
     window.testMicTracks = [];
-    navigator.mediaDevices.getUserMedia = async options => {
+    MediaDevices.prototype.getUserMedia = async function (options) {
       if (window.testDenyMic) { window.testDenyMic = false; throw new DOMException('Permission denied', 'NotAllowedError'); }
-      const stream = await original(options); window.testMicTracks.push(...stream.getTracks()); return stream;
+      let stream;
+      try { stream = await original.call(this, options); } catch {
+        const audio = new AudioContext(), tone = audio.createOscillator(), output = audio.createMediaStreamDestination();
+        tone.connect(output); tone.start(); stream = output.stream;
+      }
+      window.testMicTracks.push(...stream.getTracks()); return stream;
     };
   });
   const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000); phone.on('pageerror', error => errors.push(error.message));
@@ -129,11 +156,12 @@ try {
   await phone.getByRole('button', { name: 'Dictate a message', exact: true }).waitFor();
   assert.equal(voiceCalls.length, 1); assert.equal(await input.inputValue(), 'Existing draft\nA dictated follow-up.');
   // Lost transcription replies keep audio in IndexedDB. Reload and retry the same ID.
-  await phone.route('**/mobile/api/transcribe', async route => { await route.fetch(); await route.abort('failed'); });
+  await loseNextReply(phone, '/mobile/api/transcribe');
   await record(); await phone.getByRole('button', { name: 'Stop recording and transcribe' }).click();
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).waitFor();
   assert.equal(voiceCalls.length, 2);
-  await phone.unroute('**/mobile/api/transcribe'); await phone.reload();
+  await restoreReplies(phone, '/mobile/api/transcribe');
+  await phone.reload();
   await phone.getByRole('button', { name: /Research ideas/ }).click();
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).click();
   await phone.getByText('Voice text added. Review it, then press Send.').waitFor();
@@ -153,12 +181,12 @@ try {
   await input.fill('A thought from my phone'); await input.press('Shift+Enter'); await input.pressSequentially('Please keep the same chat.');
   assert.equal(await input.inputValue(), 'A thought from my phone\nPlease keep the same chat.');
   // The server receives the request, but its first reply is lost on the network.
-  const sendRoute = `**/mobile/api/sessions/${ids[1]}/send`;
-  await phone.route(sendRoute, async route => { await route.fetch(); await route.abort('failed'); });
+  const sendRoute = `/mobile/api/sessions/${ids[1]}/send`;
+  await loseNextReply(phone, sendRoute);
   const before = writes.length;
   await phone.getByRole('button', { name: 'Send', exact: true }).click();
   await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
-  await phone.unroute(sendRoute);
+  await restoreReplies(phone, sendRoute);
   await phone.getByRole('button', { name: 'Retry', exact: true }).click();
   await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
   assert.equal(writes.length - before, 2); assert.ok(writes[before].data.includes('A thought from my phone\nPlease keep the same chat.'));

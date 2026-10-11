@@ -1,11 +1,11 @@
 // Exercise browser-only preview with the real predev setup, including a failed lazy import.
 // No desktop service, CLI sessions, or user profile is opened.
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { launchBrowser } from '../desktop/service/test/browser.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Setup.ps1 -Mode Preview runs npm run dev, which creates this public junction.
@@ -17,7 +17,7 @@ let browser;
 try {
   await server.listen();
   const url = server.resolvedUrls.local[0];
-  browser = await chromium.launch({ channel: process.env.MRMAK_TEST_BROWSER || 'msedge', headless: true });
+  browser = await launchBrowser();
   const page = await browser.newPage();
   page.setDefaultTimeout(15000);
   const errors = [];
