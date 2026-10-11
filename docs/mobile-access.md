@@ -226,5 +226,9 @@ saved chat and mode; Conversation remembers whether you were following the
 latest reply or reading history. Chats returns to the selected chat after
 Workspace; Back to chats opens the list. Missing chats return to the list without
 selecting a different agent. Drafts remain per-chat, and desktop selection stays
-independent. Disconnect clears the saved mobile navigation state. Workspace
-report-page selection and terminal scrollback position are not persisted yet.
+independent. Disconnect clears the saved mobile navigation state. Workspace independently remembers its selected card, each card's report tab,
+and reading position. Switching sections keeps both views mounted. HTML readers
+restore their saved route, window and nested scroll positions after reopening
+through an origin-checked, scroll-only sandbox message bridge. Terminal mode
+also remembers its scrollback line and fit setting. Use All workspaces to return
+to the card list; tapping Workspace itself never closes the selected report.

@@ -22,8 +22,8 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQ42
 await writeFile(path.join(repo, 'shared-picture.png'), png);
 // Use a supplied SVG as a visible report image; the PNG is only an upload fixture.
 await copyFile(path.join(root, 'public/assets/mak-nose.svg'), path.join(repo, 'workspace/report/nose.svg'));
-await writeFile(path.join(repo, 'workspace/report/index.html'), '<!doctype html><html lang="en" data-mak-report="document"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../_shared/report.css"><script defer src="../_shared/report.js"></script></head><body><main class="container"><h1>Report ready</h1><p>A readable result on your phone.</p><img src="nose.svg" alt="Report image" width="160"><p><a target="_blank" rel="noreferrer" href="https://example.com/source">Source link</a></p></main></body></html>');
-await writeFile(path.join(repo, 'workspace/report/plan.md'), '# Mobile plan\n\n**Keep the useful parts in view.**\n\n- Read results\n- Send a follow-up\n');
+await writeFile(path.join(repo, 'workspace/report/index.html'), '<!doctype html><html lang="en" data-mak-report="document"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../_shared/report.css"><script defer src="../_shared/report.js"></script></head><body><main class="container"><h1>Report ready</h1><p>A readable result on your phone.</p><img src="nose.svg" alt="Report image" width="160"><p><a target="_blank" rel="noreferrer" href="https://example.com/source">Source link</a></p><div id="nested-scroll" style="height:100px;overflow:auto"><div style="height:600px">Nested content</div></div><div id="delayed-content" style="height:0">Long report content</div><script>window.addEventListener("load", () => setTimeout(() => document.getElementById("delayed-content").style.height = "2200px", 300))</script></main></body></html>');
+await writeFile(path.join(repo, 'workspace/report/plan.md'), '# Mobile plan\n\n**Keep the useful parts in view.**\n\n- Read results\n- Send a follow-up\n' + Array.from({ length: 60 }, (_, index) => `\nParagraph ${index + 1}: Read and continue reviewing this report.\n`).join(''));
 await writeFile(path.join(repo, 'workspace/workspace.json'), JSON.stringify({ entities: [{ id: 'mobile-report', title: 'A useful report', folder: 'report', category: 'dev', created: '2026-10-06', steps: [{ name: 'Report', path: 'index.html' }, { name: 'Plan', path: 'plan.md' }] }] }));
 const transport = { probe: async () => ({ ready: true, installed: true }), enable: async origin => ({ origin }), disable: async () => {} };
 const voiceCalls = [];
@@ -377,7 +377,7 @@ try {
   await phone.locator('.mobile-messages').evaluate(box => { box.scrollTop = 0; box.dispatchEvent(new Event('scroll')); });
   await phone.getByRole('button', { name: 'Terminal', exact: true }).click();
   await phone.getByRole('button', { name: 'Conversation', exact: true }).click();
-  assert.ok(await nearBottom(), 'Returning from Terminal opens the end');
+  assert.equal(await phone.locator('.mobile-messages').evaluate(box => box.scrollTop), 0, 'Returning from Terminal preserves history position');
   await phone.getByRole('button', { name: 'Terminal', exact: true }).click();
   await phone.locator('.mobile-terminal').waitFor();
   await phone.reload();
@@ -386,7 +386,8 @@ try {
   assert.equal(await phone.locator('.mobile-messages').count(), 0, 'Reload restores Terminal mode');
   await phone.getByRole('button', { name: 'Conversation', exact: true }).click();
 
-  assert.equal(await phone.getByRole('button', { name: 'Jump to latest' }).count(), 0);
+  await phone.getByRole('button', { name: 'Jump to latest' }).click();
+  assert.ok(await nearBottom());
   service.mobile.transcripts.read = readerBeforeScroll;
   await phone.waitForFunction(() => document.querySelectorAll('.mobile-message').length === 5);
 
@@ -517,8 +518,38 @@ try {
   await phone.screenshot({ path: path.join(repo, 'phone-report.png') });
   assert.equal(await phone.locator('.mobile-report-heading, .mobile-report-tabs').count(), 0);
   assert.equal(await phone.locator('.mobile-header h1').innerText(), 'A useful report');
+  await expect.poll(() => frame.locator('#delayed-content').evaluate(node => node.offsetHeight)).toBe(2200);
+  const htmlIdentity = await frame.locator('body').evaluate(() => { window.testReportIdentity = Math.random(); location.hash = '#chapter-two'; window.scrollTo(0,500); document.getElementById('nested-scroll').scrollTop = 180; return window.testReportIdentity; });
+  const reportKey = 'mrmak.mobile.report.mobile-report.0';
+  await expect.poll(() => phone.evaluate(key => JSON.parse(localStorage.getItem(key) || '{}').top, reportKey)).toBe(500);
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await expect(stableDraft).toBeVisible();
+  await phone.getByRole('button', { name: 'Results', exact: true }).click();
+  await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
+  assert.equal(await frame.locator('body').evaluate(() => window.testReportIdentity), htmlIdentity, 'Section switching keeps the same report document');
+  assert.equal(await frame.locator('body').evaluate(() => window.scrollY), 500);
+  assert.equal(await frame.locator('#nested-scroll').evaluate(node => node.scrollTop), 180);
+  const beforeForged = await phone.evaluate(key => localStorage.getItem(key), reportKey);
+  await phone.evaluate(() => window.dispatchEvent(new MessageEvent('message', { source: window, origin: 'null', data: { type: 'mrmak:report-state', state: { path: 'malicious', top: 999, left: 0 } } })));
+  assert.equal(await phone.evaluate(key => localStorage.getItem(key), reportKey), beforeForged, 'Messages from another window cannot change report position');
+  await phone.reload();
+  await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
+  await expect.poll(() => frame.locator('body').evaluate(() => window.scrollY)).toBe(500);
+  assert.equal(await frame.locator('body').evaluate(() => location.hash), '#chapter-two');
+  assert.equal(await frame.locator('#nested-scroll').evaluate(node => node.scrollTop), 180);
+
   await phone.getByLabel('Select report page', { exact: true }).click();
   await phone.getByRole('button', { name: 'Plan', exact: true }).click(); await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  await phone.locator('.mobile-report-markdown').evaluate(node => { node.scrollTop = 350; node.dispatchEvent(new Event('scroll')); });
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await expect(stableDraft).toBeVisible();
+  await phone.getByRole('button', { name: 'Results', exact: true }).click();
+  await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  assert.equal(await phone.locator('.mobile-report-markdown').evaluate(node => node.scrollTop), 350);
+  await phone.reload();
+  await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  await expect.poll(() => phone.locator('.mobile-report-markdown').evaluate(node => node.scrollTop)).toBe(350);
+
   for (const width of [360, 390, 768]) {
     await phone.setViewportSize({ width, height: 844 });
     assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `No page overflow at ${width}px`);
@@ -526,9 +557,14 @@ try {
   await phone.getByLabel('Select report page', { exact: true }).click();
   await phone.getByRole('button', { name: 'Close report', exact: true }).click();
   await phone.getByRole('button', { name: /A useful report/ }).click();
+  await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
+  await phone.getByLabel('Select report page', { exact: true }).click();
+  await phone.getByRole('button', { name: 'Report', exact: true }).click();
   await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
   await phone.getByRole('button', { name: 'Results', exact: true }).click();
-  assert.equal(await phone.locator('iframe').count(), 0);
+  await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
+  await phone.getByLabel('Select report page', { exact: true }).click();
+  await phone.getByRole('button', { name: 'Close report', exact: true }).click();
   await phone.getByRole('heading', { name: 'Workspace', exact: true }).waitFor();
   // Close the selected desktop chat from the phone, then resume it from History.
   // Only the launch is stubbed; closing/persistence/selection use the real service.

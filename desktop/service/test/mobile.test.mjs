@@ -188,6 +188,12 @@ test('report grants are limited to the selected folder, sandboxed and revoked wi
   await writeFile(path.join(repo, 'workspace/other/private.html'), 'Unrelated document');
   await writeFile(path.join(repo, 'workspace/workspace.json'), JSON.stringify({ entities: [{ id: 'example', title: 'Example', folder: 'example', steps: [{ name: 'Report', path: 'report.html' }] }] }));
   const opened = await request('/reports/open', { entityId: 'example', step: 0 }, device.cookie); assert.equal(opened.status, 200);
+  assert.equal(opened.data.statePersistence, true);
+  const token = opened.data.url.split('/')[3], grant = gateway.reports.grants.get(token);
+  grant.expires = Date.now() + 1000;
+  const renewed = await request('/reports/open', { entityId: 'example', step: 0 }, device.cookie);
+  assert.equal(renewed.data.url, opened.data.url, 'Renewing a valid grant keeps the same document URL');
+  assert.ok(gateway.reports.grants.get(token).expires > Date.now() + 20 * 60 * 1000);
   const url = `${gateway.origin}${opened.data.url}`;
   const response = await fetch(url, { headers: { Origin: 'null' } }); assert.equal(response.status, 200);
   const policy = response.headers.get('content-security-policy');
