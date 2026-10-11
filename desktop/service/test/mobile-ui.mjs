@@ -352,11 +352,23 @@ try {
   const draftBeforeWake = 'Keep my draft while the phone sleeps.';
   await phone.getByRole('textbox', { name: 'Message' }).fill(draftBeforeWake);
   const beforeWake = await phone.evaluate(() => ({ sockets: window.testConnections.length, identity: window.testDocumentIdentity, scroll: document.querySelector('.mobile-messages').scrollTop }));
-  let heldBootstrap, holdNextBootstrap = true;
-  await phone.route('**/mobile/api/bootstrap', route => { if (holdNextBootstrap) { holdNextBootstrap = false; heldBootstrap = route; } else return route.continue(); });
+  // Intercept the caller rather than the service worker's network request:
+  // WebKit's Playwright routing cannot hold a service-worker fetch.
+  await phone.evaluate(() => {
+    const original = window.fetch; let hold = true;
+    window.testReleaseBootstrap = null;
+    window.testRestoreFetch = () => { window.fetch = original; };
+    window.fetch = (...args) => {
+      if (hold && String(args[0]).endsWith('/mobile/api/bootstrap')) {
+        hold = false;
+        return new Promise((_, reject) => { window.testReleaseBootstrap = () => reject(new DOMException('Test lost bootstrap', 'AbortError')); });
+      }
+      return original(...args);
+    };
+  });
   await phone.evaluate(() => { window.testDelayClose = true; });
   await phone.getByRole('button', { name: 'Reconnect', exact: true }).click();
-  await expect.poll(() => !!heldBootstrap).toBeTruthy();
+  await phone.waitForFunction(() => !!window.testReleaseBootstrap);
   const wakeStarted = Date.now();
   await phone.evaluate(() => {
     window.testDelayClose = true; window.testVisibility = 'hidden'; document.dispatchEvent(new Event('visibilitychange'));
@@ -368,7 +380,7 @@ try {
   await expect(phone.getByRole('textbox', { name: 'Message' })).toHaveValue(draftBeforeWake);
   assert.equal(await phone.locator('.mobile-terminal').count(), 0, 'Conversation mode stays selected');
   assert.equal(await phone.evaluate(() => document.querySelector('.mobile-messages').scrollTop), beforeWake.scroll);
-  await heldBootstrap.abort().catch(() => {}); await phone.unroute('**/mobile/api/bootstrap');
+  await phone.evaluate(() => { window.testReleaseBootstrap(); window.testRestoreFetch(); });
   await phone.evaluate(() => { window.testDelayClose = false; for (const socket of window.testDelayedSockets) socket.close(); window.testDelayedSockets = []; });
   await phone.getByRole('textbox', { name: 'Message' }).fill('');
   const recentActivity = phone.locator('.mobile-tool-activity');
@@ -588,8 +600,10 @@ try {
   assert.equal(await frame.locator('#nested-scroll').evaluate(node => node.scrollTop), 180);
 
   // Attach navigation only, freeze it for retries, and keep the transcript readable.
-  const contextRoute = `**/mobile/api/sessions/${ids[1]}/send`, contextPayloads = [];
-  await phone.route(contextRoute, async route => { contextPayloads.push(route.request().postDataJSON()); await route.fetch(); await route.abort('failed'); });
+  const contextRoute = `/mobile/api/sessions/${ids[1]}/send`, contextPayloads = [];
+  const originalSubmit = service.mobile.submit;
+  service.mobile.submit = function (device, id, data) { if (id === ids[1]) contextPayloads.push(structuredClone(data)); return originalSubmit.call(this, device, id, data); };
+  await loseNextReply(phone, contextRoute);
   await phone.getByRole('button', { name: 'Chats', exact: true }).click();
   await input.fill('Adjust this section when I ask.');
   const contextBefore = writes.length;
@@ -605,8 +619,7 @@ try {
   await phone.getByRole('button', { name: 'Plan', exact: true }).click(); await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
   await phone.getByRole('button', { name: 'Chats', exact: true }).click(); await phone.reload();
   await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
-  await phone.unroute(contextRoute);
-  await phone.route(contextRoute, async route => { contextPayloads.push(route.request().postDataJSON()); await route.continue(); });
+  await restoreReplies(phone, contextRoute);
   await phone.getByRole('button', { name: 'Retry', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
   assert.equal(writes.length - contextBefore, 2, 'Changed Workspace and reload do not duplicate delivery');
   assert.deepEqual(contextPayloads[1], contextPayloads[0], 'A retry retains the exact original context');
@@ -616,7 +629,7 @@ try {
   assert.equal(contextMetadata(contextPayloads.at(-1).text).workspace.reportEntryPage, 'workspace/report/plan.md');
   assert.equal(contextMetadata(contextPayloads.at(-1).text).workspace.sectionAnchor, undefined, 'Another tab never inherits an old section');
   assert.equal(writes.length - planBefore, 2);
-  await phone.unroute(contextRoute);
+  service.mobile.submit = originalSubmit;
   const contextReader = service.mobile.transcripts.read;
   service.mobile.transcripts.read = async () => ({ supported: true, messages: [{ id: 'context-user', role: 'user', text: deliveredContext, at: new Date().toISOString() }, { id: 'context-assistant', role: 'assistant', text: 'Ready when you ask.', at: new Date().toISOString() }] });
   await expect(phone.locator('.mobile-message.user .mobile-message-copy')).toHaveCount(1);
