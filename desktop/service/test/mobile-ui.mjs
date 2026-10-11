@@ -79,7 +79,7 @@ try {
     const service = new EventTarget();
     window.testSpeech = { spoken: [], cancelled: 0, paused: false, current: null };
     Object.assign(service, {
-      getVoices: () => [{ voiceURI: 'local-en', name: 'Test English', lang: 'en-US', localService: true, default: true }, { voiceURI: 'local-tr', name: 'Test Turkish', lang: 'tr-TR', localService: true, default: false }],
+      getVoices: () => [{ voiceURI: 'local-en', name: 'Test English', lang: 'en-US', localService: true, default: true }, { voiceURI: 'local-gb', name: 'Test British', lang: 'en-GB', localService: true, default: false }, { voiceURI: 'local-au', name: 'Test Australian', lang: 'en-AU', localService: true, default: false }, { voiceURI: 'local-tr', name: 'Test Turkish', lang: 'tr-TR', localService: true, default: false }],
       speak: utterance => { window.testSpeech.spoken.push({ text: utterance.text, voice: utterance.voice?.voiceURI }); window.testSpeech.current = utterance; },
       cancel: () => { window.testSpeech.cancelled++; window.testSpeech.current = null; },
       pause: () => { window.testSpeech.paused = true; }, resume: () => { window.testSpeech.paused = false; },
@@ -227,6 +227,8 @@ try {
   const readButton = phone.locator('.mobile-message.assistant').getByRole('button', { name: 'Read aloud', exact: true }).first();
   assert.equal(await phone.evaluate(() => window.testSpeech.spoken.length), 0, 'No automatic playback');
   await expect(phone.getByRole('button', { name: 'Read aloud', exact: true })).toHaveCount(1);
+  assert.equal(await readButton.innerText(), '', 'Read aloud is an icon without visible text');
+  await expect(readButton.locator('svg')).toHaveCount(1);
   await expect(phone.locator('.mobile-message').last().getByRole('button', { name: 'Read aloud', exact: true })).toBeVisible();
   await readButton.click();
   assert.ok((await phone.evaluate(() => window.testSpeech.spoken[0].text)).startsWith('Can we make'));
@@ -243,9 +245,16 @@ try {
   assert.equal(await phone.evaluate(() => window.testSpeech.paused), true);
   await phone.getByRole('button', { name: 'Resume reading' }).click();
   assert.equal(await phone.evaluate(() => window.testSpeech.paused), false);
-  await phone.getByRole('combobox', { name: 'Reading voice' }).selectOption('local-tr');
+  assert.equal(await phone.locator('.mobile-messages select').count(), 0, 'Voice selection stays in settings');
+  await phone.getByRole('button', { name: 'Phone settings' }).click();
+  const readingVoice = phone.getByRole('combobox', { name: 'English reading voice' });
+  await expect(readingVoice.locator('option')).toHaveCount(2);
+  assert.deepEqual(await readingVoice.locator('option').evaluateAll(options => options.map(option => option.value)), ['local-en', 'local-gb']);
+  await readingVoice.selectOption('local-gb');
+  assert.equal(await phone.evaluate(() => localStorage.getItem('mrmak.mobile.read-aloud.voice')), 'local-gb');
+  await phone.getByRole('button', { name: 'Phone settings' }).click();
   await readButton.click();
-  assert.equal(await phone.evaluate(() => window.testSpeech.spoken.at(-1).voice), 'local-tr');
+  assert.equal(await phone.evaluate(() => window.testSpeech.spoken.at(-1).voice), 'local-gb');
   await phone.getByRole('button', { name: 'Stop reading' }).click();
   assert.equal(await phone.evaluate(() => window.testSpeech.current), null);
   await readButton.click();

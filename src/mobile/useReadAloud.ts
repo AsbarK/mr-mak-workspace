@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { readingVoiceChanged, savedReadingVoice, selectedEnglishVoice } from './readingVoices'
 
 export function spokenText(element: HTMLElement | null) {
   if (!element) return ''
@@ -22,8 +23,6 @@ function chunks(text: string) {
 export function useReadAloud() {
   const supported = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined'
   const [activeId, setActiveId] = useState<string | null>(null), [paused, setPaused] = useState(false), [error, setError] = useState('')
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
-  const [voiceId, setVoiceId] = useState(() => { try { return localStorage.getItem('mrmak.mobile.read-aloud.voice') || '' } catch { return '' } })
   const generation = useRef(0), utterance = useRef<SpeechSynthesisUtterance | null>(null)
   const stop = useCallback(() => {
     generation.current++; utterance.current = null
@@ -32,17 +31,16 @@ export function useReadAloud() {
   }, [supported])
   useEffect(() => {
     if (!supported) return
-    const synth = window.speechSynthesis, playbackGeneration = generation, currentUtterance = utterance, load = () => setVoices(synth.getVoices())
-    load(); synth.addEventListener('voiceschanged', load)
-    return () => { playbackGeneration.current++; currentUtterance.current = null; synth.cancel(); synth.removeEventListener('voiceschanged', load) }
-  }, [supported])
-  function chooseVoice(value: string) { stop(); setVoiceId(value); try { localStorage.setItem('mrmak.mobile.read-aloud.voice', value) } catch { /* Device storage may be unavailable. */ } }
+    const synth = window.speechSynthesis, playbackGeneration = generation, currentUtterance = utterance
+    window.addEventListener(readingVoiceChanged, stop)
+    return () => { playbackGeneration.current++; currentUtterance.current = null; synth.cancel(); window.removeEventListener(readingVoiceChanged, stop) }
+  }, [supported, stop])
   function read(id: string, text: string) {
     if (!supported) { setError('Read aloud is unavailable in this browser.'); return }
     stop(); setError('')
     if (!text.trim()) { setError('This reply has no text to read aloud.'); return }
     const synth = window.speechSynthesis, available = synth.getVoices()
-    const voice = available.find(item => item.voiceURI === voiceId) || available.find(item => item.localService && item.default) || available.find(item => item.localService && item.lang.split('-')[0] === navigator.language.split('-')[0]) || available.find(item => item.default)
+    const voice = selectedEnglishVoice(available, savedReadingVoice())
     const queue = chunks(text), run = generation.current
     setActiveId(id)
     const next = () => {
@@ -50,7 +48,7 @@ export function useReadAloud() {
       const part = queue.shift()
       if (!part) { utterance.current = null; setActiveId(null); setPaused(false); return }
       const speech = new SpeechSynthesisUtterance(part); utterance.current = speech
-      if (voice) { speech.voice = voice; speech.lang = voice.lang } else speech.lang = navigator.language || 'en-US'
+      if (voice) { speech.voice = voice; speech.lang = voice.lang } else speech.lang = 'en-US'
       speech.onend = next
       speech.onerror = event => {
         if (generation.current !== run) return
@@ -65,5 +63,5 @@ export function useReadAloud() {
     if (paused) window.speechSynthesis.resume(); else window.speechSynthesis.pause()
     setPaused(!paused)
   }
-  return { supported, activeId, paused, error, voices, voiceId, chooseVoice, read, stop, togglePause }
+  return { supported, activeId, paused, error, read, stop, togglePause }
 }
