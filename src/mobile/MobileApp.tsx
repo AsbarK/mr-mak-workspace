@@ -5,6 +5,7 @@ import { AgentLogo, Icon, Nose } from '../desktop/Icons'
 import type { ChatSession } from '../desktop/types'
 import { chatActivityLabel } from '../desktop/chatActivity'
 import { chooseMobileDictation, disconnectMobile, mobileApi, mobileEvent, reconnectMobile, onMobileEvent, selectMobileChat, startMobile, useMobile } from './client'
+import { mobileChatPosition, saveMobileChatPosition, setMobileHistory, setMobileView, useMobileNavigation } from './app-state'
 import Terminal from './Terminal'
 import Composer from './Composer'
 import ConversationImages from './ConversationImages'
@@ -62,7 +63,8 @@ function Connect() {
 
 function Conversation({ session }: { session: ChatSession }) {
   const speech = useReadAloud(session.id), stopReading = speech.stop
-  const [mode, setMode] = useState<'messages' | 'terminal'>(['codex', 'claude'].includes(session.agent) ? 'messages' : 'terminal')
+  const [mode, setMode] = useState<'messages' | 'terminal'>(() => mobileChatPosition(session.id).mode || (['codex', 'claude'].includes(session.agent) ? 'messages' : 'terminal'))
+  useEffect(() => saveMobileChatPosition(session.id, { mode }), [session.id, mode])
   useEffect(() => { if (mode === 'terminal') stopReading() }, [mode, stopReading])
   const [messages, setMessages] = useState<Message[]>([]), [supported, setSupported] = useState(true), [error, setError] = useState('')
   let readStart = 0
@@ -70,7 +72,8 @@ function Conversation({ session }: { session: ChatSession }) {
   const readEnd = messages.length - 1, latestUserId = messages[readStart]?.role === 'user' ? messages[readStart].id : null
   useEffect(() => () => stopReading(), [latestUserId, stopReading])
   const [activity, setActivity] = useState<ToolActivity[]>([])
-  const scroller = useRef<HTMLDivElement>(null), follow = useRef(true), state = useMobile()
+  const [initialPosition] = useState(() => mobileChatPosition(session.id))
+  const scroller = useRef<HTMLDivElement>(null), restored = useRef(false), follow = useRef(initialPosition.follow !== false), state = useMobile()
   const [showJump, setShowJump] = useState(false)
   function jumpToLatest() { follow.current = true; setShowJump(false); const box = scroller.current; if (box) box.scrollTop = box.scrollHeight }
   function showConversation() { follow.current = true; setShowJump(false); setMode('messages') }
@@ -98,7 +101,15 @@ function Conversation({ session }: { session: ChatSession }) {
     return () => { stopped = true; clearInterval(timer); off() }
   }, [session.id, session.completionVersion])
   useLayoutEffect(() => { if (mode === 'messages' && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight }, [mode])
-  useLayoutEffect(() => { if (follow.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight }, [messages])
+  useLayoutEffect(() => {
+    const box = scroller.current
+    if (mode !== 'messages' || !box || !messages.length) return
+    if (!restored.current) {
+      box.scrollTop = follow.current ? box.scrollHeight : initialPosition.top || 0; restored.current = true
+      requestAnimationFrame(() => { if (scroller.current === box) { const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 100; follow.current = nearEnd; setShowJump(!nearEnd) } })
+    }
+    else if (follow.current) box.scrollTop = box.scrollHeight
+  }, [messages, mode, initialPosition])
   const running = session.status === 'running'
   return <>
     <div className="mobile-chat-tools"><div className="mobile-segment" role="group" aria-label="Conversation view"
@@ -114,7 +125,7 @@ function Conversation({ session }: { session: ChatSession }) {
       }}
       onClickCapture={event => { if (suppressModeClick.current) { event.preventDefault(); event.stopPropagation(); suppressModeClick.current = false } }}
     ><button className={mode === 'messages' ? 'active' : ''} onClick={showConversation}>Conversation</button><button className={mode === 'terminal' ? 'active' : ''} onClick={() => { speech.stop(); setMode('terminal') }}>Terminal</button></div><ActivityStatus session={session} connected={state.connected} /></div>
-    {mode === 'terminal' ? <Terminal id={session.id} /> : <div className="mobile-message-pane"><div className="mobile-messages" ref={scroller} onScroll={() => { const box = scroller.current; if (box) { const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 100; follow.current = nearEnd; setShowJump(!nearEnd) } }}>
+    {mode === 'terminal' ? <Terminal id={session.id} /> : <div className="mobile-message-pane"><div className="mobile-messages" ref={scroller} onScroll={() => { const box = scroller.current; if (box) { const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 100; if (!restored.current) return; follow.current = nearEnd; saveMobileChatPosition(session.id, { top: box.scrollTop, follow: nearEnd }); setShowJump(!nearEnd) } }}>
       <div className="mobile-history-note">{checkedAt ? `Transcript checked ${new Date(checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading conversation…'}{messages[messages.length - 1]?.at && ` · Last message ${new Date(messages[messages.length - 1].at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}</div>
       {(readError || (session.activity === 'working' && now - changedAt >= 45000)) && <div className="mobile-transcript-status" role="status"><p>{readError || 'Conversation has not updated recently. The terminal may have newer output.'}</p><button onClick={() => { speech.stop(); setMode('terminal') }}>Open terminal<Icon name="arrow" size={15} /></button></div>}
       {messages.map((message, index) => <article className={`mobile-message ${message.role}`} key={message.id}><header>{message.role === 'user' ? 'You' : <><AgentLogo agent={session.agent} size={15} />{session.agent === 'claude' ? 'Claude' : 'Codex'}</>}{message.at && <time>{new Date(message.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}</header><div className="mobile-message-copy"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: () => null, a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>{message.text}</ReactMarkdown></div><ConversationImages images={message.images} />{index === readEnd && message.role === 'assistant' && messages.slice(readStart).some(item => item.text.trim()) && <div className="mobile-read-aloud"><button type="button" disabled={!speech.supported} aria-label={speech.activeId ? speech.paused ? 'Resume reading' : 'Pause reading' : 'Read aloud'} title={!speech.supported ? 'Read aloud is unavailable in this browser' : speech.activeId ? speech.paused ? 'Resume reading' : 'Pause reading' : 'Read from your last message to this reply'} onClick={() => { if (speech.activeId) speech.togglePause(); else speech.read(message.id, Array.from(scroller.current?.querySelectorAll<HTMLElement>('.mobile-message-copy') || []).slice(readStart, readEnd + 1).map(spokenText).filter(Boolean).join('\n\n')) }}><Icon name={speech.activeId ? speech.paused ? 'play' : 'pause' : 'speaker'} size={19} /></button>{speech.activeId && <button type="button" aria-label="Stop reading" title="Stop reading" onClick={speech.stop}><Icon name="stop" size={17} /></button>}</div>}</article>)}
@@ -146,7 +157,8 @@ export default function MobileApp() {
   const installation = useInstall()
   const resultsNavigation = useRef<ResultsNavigation>(null)
   const [resultsHeader, setResultsHeader] = useState<HTMLDivElement | null>(null)
-  const state = useMobile(), [view, setView] = useState<'list' | 'chat' | 'results'>('list'), [history, setHistory] = useState(false), [query, setQuery] = useState(''), [creating, setCreating] = useState(false), [settings, setSettings] = useState(false)
+  const { view, history } = useMobileNavigation()
+  const state = useMobile(), [query, setQuery] = useState(''), [creating, setCreating] = useState(false), [settings, setSettings] = useState(false)
   const [closing, setClosing] = useState(false), [closeError, setCloseError] = useState('')
   const [refreshing, setRefreshing] = useState(false), refreshTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(refreshTimer.current), [])
@@ -171,12 +183,13 @@ export default function MobileApp() {
     return () => { manifest.remove(); icon.remove(); theme.remove(); if (viewport && previousViewport) viewport.content = previousViewport; window.visualViewport?.removeEventListener('resize', resize); window.removeEventListener('resize', resize); document.documentElement.style.removeProperty('--mobile-height') }
   }, [])
   const session = state.sessions.find(item => item.id === state.selectedId)
-  function open(id: string) { selectMobileChat(id); setCloseError(''); setView('chat') }
+  useEffect(() => { if (state.ready && state.authenticated && view === 'chat' && !session) setMobileView('list') }, [state.ready, state.authenticated, view, session])
+  function open(id: string) { selectMobileChat(id); setCloseError(''); setMobileView('chat') }
   async function closeChat() {
     if (!session || closing || !state.connected) return
     if (!window.confirm(`Close "${session.name}"? This closes the desktop tab and stops its CLI. The conversation stays in History.`)) return
     setClosing(true); setCloseError('')
-    try { await mobileApi(`/sessions/${session.id}/close`, {}); setView('list') }
+    try { await mobileApi(`/sessions/${session.id}/close`, {}); setMobileView('list') }
     catch (err) { setCloseError(err instanceof Error ? err.message : String(err)) }
     finally { setClosing(false) }
   }
@@ -185,14 +198,14 @@ export default function MobileApp() {
   const items = [...state.sessions].filter(item => (history || item.open) && `${item.name} ${item.agent}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => Number(b.pinned) - Number(a.pinned) || (history ? b.updatedAt.localeCompare(a.updatedAt) : a.tabOrder - b.tabOrder))
   const title = view === 'chat' && session ? session.name : view === 'results' ? 'Workspace' : history ? 'History' : 'Chats'
   return <div className="mobile-app"><header className={`mobile-header ${view === 'chat' ? 'mobile-header-chat' : ''}`}>
-    {view === 'chat' && <button className="mobile-icon" aria-label="Back to chats" onClick={() => setView('list')}><Icon name="back" /></button>}
+    {view === 'chat' && <button className="mobile-icon" aria-label="Back to chats" onClick={() => setMobileView('list')}><Icon name="back" /></button>}
     <button className={`mobile-nose-refresh ${refreshing ? 'refreshing' : ''}`} aria-label="Reconnect" title="Reconnect without leaving this page" onClick={refreshPage} disabled={refreshing}><span className={`mobile-connection-logo ${state.connected ? 'online' : ''}`} role="status" aria-label={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'} title={state.connected ? 'Connected to your computer' : 'Reconnecting · your agents keep working'}><Nose size={26} /></span></button>
     <div className="mobile-header-title" ref={setResultsHeader} id={view === 'results' ? 'mobile-results-header' : undefined}>{view !== 'results' && <h1>{title}</h1>}{view === 'list' && <span className="mobile-header-count" aria-label={`${items.length} ${items.length === 1 ? 'chat' : 'chats'}`}>· {items.length}</span>}</div>
     {view === 'chat' && session?.open && <button className="mobile-icon" aria-label="Close chat" title="Close chat" disabled={!state.connected || closing} onClick={() => void closeChat()}><Icon name="trash" size={19} /></button>}
     <nav className="mobile-main-nav" aria-label="Mobile sections">
-      {view === 'list' && <><button className="mobile-icon" aria-label="New chat" title="New chat" onClick={() => setCreating(true)} disabled={!state.connected}><Icon name="plus" size={19} /></button><button className={`mobile-icon ${history ? 'active' : ''}`} aria-label="History" title={history ? 'Show active chats' : 'Chat history'} aria-pressed={history} onClick={() => setHistory(!history)}><Icon name="history" size={19} /></button></>}
-      <button className={`mobile-icon ${view === 'chat' || (view === 'list' && !history) ? 'active' : ''}`} aria-label="Chats" title="Chats" aria-current={view === 'chat' || (view === 'list' && !history) ? 'page' : undefined} onClick={() => { setHistory(false); setView('list') }}><Icon name="chats" size={19} /></button>
-      <button className={`mobile-icon ${view === 'results' ? 'active' : ''}`} aria-label="Results" title="Workspace" aria-current={view === 'results' ? 'page' : undefined} onClick={() => { resultsNavigation.current?.closeReport(); setView('results') }}><Icon name="workspace" size={19} /></button>
+      {view === 'list' && <><button className="mobile-icon" aria-label="New chat" title="New chat" onClick={() => setCreating(true)} disabled={!state.connected}><Icon name="plus" size={19} /></button><button className={`mobile-icon ${history ? 'active' : ''}`} aria-label="History" title={history ? 'Show active chats' : 'Chat history'} aria-pressed={history} onClick={() => setMobileHistory(!history)}><Icon name="history" size={19} /></button></>}
+      <button className={`mobile-icon ${view === 'chat' || (view === 'list' && !history) ? 'active' : ''}`} aria-label="Chats" title="Chats" aria-current={view === 'chat' || (view === 'list' && !history) ? 'page' : undefined} onClick={() => { setMobileHistory(false); setMobileView(session ? 'chat' : 'list') }}><Icon name="chats" size={19} /></button>
+      <button className={`mobile-icon ${view === 'results' ? 'active' : ''}`} aria-label="Results" title="Workspace" aria-current={view === 'results' ? 'page' : undefined} onClick={() => { resultsNavigation.current?.closeReport(); setMobileView('results') }}><Icon name="workspace" size={19} /></button>
     </nav>
     <button className="mobile-icon" aria-label="Phone settings" title="Phone settings" onClick={() => setSettings(!settings)}><Icon name="phone" size={19} /></button>
   </header>

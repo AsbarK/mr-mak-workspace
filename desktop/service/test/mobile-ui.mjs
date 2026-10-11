@@ -356,6 +356,21 @@ try {
   await phone.getByRole('button', { name: 'Jump to latest' }).waitFor();
   await phone.waitForTimeout(2400);
   assert.equal(await phone.locator('.mobile-messages').evaluate(box => box.scrollTop), 0, 'Polling does not pull a history reader to the end');
+  const stableDraft = phone.getByRole('textbox', { name: 'Message this chat' });
+  const selectedBeforeWorkspace = await phone.locator('.mobile-header h1').innerText();
+  await stableDraft.fill('A draft retained across mobile views.');
+  await phone.getByRole('button', { name: 'Results', exact: true }).click();
+  await phone.getByRole('heading', { name: 'Workspace', exact: true }).waitFor();
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
+  await expect(stableDraft).toHaveValue('A draft retained across mobile views.');
+  await expect.poll(() => phone.locator('.mobile-messages').evaluate(box => box.scrollTop)).toBe(0);
+  await phone.reload();
+  await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
+  await expect(stableDraft).toHaveValue('A draft retained across mobile views.');
+  await expect.poll(() => phone.locator('.mobile-messages').evaluate(box => box.scrollTop)).toBe(0);
+  await stableDraft.fill('');
+
   await phone.getByRole('button', { name: 'Jump to latest' }).click();
   assert.ok(await nearBottom());
   assert.equal(await phone.getByRole('button', { name: 'Jump to latest' }).count(), 0);
@@ -363,6 +378,14 @@ try {
   await phone.getByRole('button', { name: 'Terminal', exact: true }).click();
   await phone.getByRole('button', { name: 'Conversation', exact: true }).click();
   assert.ok(await nearBottom(), 'Returning from Terminal opens the end');
+  await phone.getByRole('button', { name: 'Terminal', exact: true }).click();
+  await phone.locator('.mobile-terminal').waitFor();
+  await phone.reload();
+  await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
+  await phone.locator('.mobile-terminal').waitFor();
+  assert.equal(await phone.locator('.mobile-messages').count(), 0, 'Reload restores Terminal mode');
+  await phone.getByRole('button', { name: 'Conversation', exact: true }).click();
+
   assert.equal(await phone.getByRole('button', { name: 'Jump to latest' }).count(), 0);
   service.mobile.transcripts.read = readerBeforeScroll;
   await phone.waitForFunction(() => document.querySelectorAll('.mobile-message').length === 5);
@@ -399,7 +422,7 @@ try {
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).waitFor();
   assert.equal(voiceCalls.length, 2);
   await phone.unroute('**/mobile/api/transcribe'); await phone.reload();
-  await phone.getByRole('button', { name: /Research ideas/ }).click();
+  await phone.getByRole('heading', { name: 'Research ideas', exact: true }).waitFor();
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).click();
   await expect(input).toHaveValue('Existing draft\nA dictated follow-up.\nA dictated follow-up.');
   assert.equal(voiceCalls.length, 2); assert.equal(writes.length, writesBeforeVoice);
@@ -510,6 +533,7 @@ try {
   // Close the selected desktop chat from the phone, then resume it from History.
   // Only the launch is stubbed; closing/persistence/selection use the real service.
   await phone.getByRole('button', { name: 'Chats', exact: true }).click();
+  await phone.getByRole('button', { name: 'Back to chats', exact: true }).click();
   await phone.getByRole('button', { name: /Game animations/ }).click();
   await desktop.getByRole('button', { name: 'Close mobile access', exact: true }).click();
   await desktop.locator(`[data-chat-tab="${ids[0]}"] [role="tab"]`).click();

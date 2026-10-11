@@ -219,3 +219,12 @@ limit, using the same paired-device/chat grants as images. Playback depends on
 the phone supporting the recorded codec. External video URLs and arbitrary
 paths printed in terminal tool logs are not fetched. Agents should share
 recordings as a Markdown link to the saved file.
+
+Mobile saves its selected chat, app section, History choice and each chat's
+Conversation/Terminal mode on that phone. Reloading or reopening restores the
+saved chat and mode; Conversation remembers whether you were following the
+latest reply or reading history. Chats returns to the selected chat after
+Workspace; Back to chats opens the list. Missing chats return to the list without
+selecting a different agent. Drafts remain per-chat, and desktop selection stays
+independent. Disconnect clears the saved mobile navigation state. Workspace
+report-page selection and terminal scrollback position are not persisted yet.

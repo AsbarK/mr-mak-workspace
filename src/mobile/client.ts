@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentInfo, ChatSession } from '../desktop/types'
+import { resetMobileNavigation } from './app-state'
 import { clearVoiceDrafts, type VoiceDraft } from './voice-drafts'
 
 export interface DictationInfo { available: boolean; provider: string | null; providers?: { id: string; label: string; available: boolean; detail: string }[]; maxSeconds: number; maxBytes: number }
@@ -77,7 +78,7 @@ export async function startMobile() {
     const initial = await mobileApi<Pick<MobileState, 'sessions' | 'agents' | 'device' | 'defaultAgent' | 'defaultBypass' | 'dictation'>>('/bootstrap', undefined, AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]))
     if (version !== connectionVersion || controller.signal.aborted) return
     authRejected = false
-    update({ ...initial, ready: true, authenticated: true, error: '', selectedId: initial.sessions.some(item => item.id === state.selectedId) ? state.selectedId : initial.sessions.find(item => item.open)?.id || initial.sessions[0]?.id || null })
+    update({ ...initial, ready: true, authenticated: true, error: '', selectedId: initial.sessions.some(item => item.id === state.selectedId) ? state.selectedId : null })
     const url = new URL('/mobile/events', location.href); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(url); socket = ws; lastReply = Date.now(); lastPing = 0
     ws.onmessage = message => {
@@ -109,6 +110,7 @@ export async function startMobile() {
 export async function disconnectMobile() {
   await mobileApi('/disconnect', {}); stopped = true; authRejected = true; releaseConnection()
   for (const key of Object.keys(localStorage)) if (key.startsWith('mrmak.mobile.')) localStorage.removeItem(key)
+  resetMobileNavigation()
   sessionStorage.removeItem('mrmak.mobile.pair'); sessionStorage.removeItem('mrmak.mobile.pending')
   await clearVoiceDrafts().catch(() => {})
   update({ authenticated: false, connected: false, sessions: [], selectedId: null }); stopped = false
