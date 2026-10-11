@@ -1,5 +1,6 @@
 // Isolated workspace, fake microphone and transcription; no real agent input.
-import { chromium, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { launchBrowser } from './browser.mjs';
 import { mkdtemp, mkdir, cp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,8 +20,17 @@ session.status = 'running'; session.process = { write: data => writes.push(data)
 service.sessions.items.set(session.id, session);
 let browser;
 try {
-  browser = await chromium.launch({ headless: true, channel: 'msedge', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  browser = await launchBrowser({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+  await page.addInitScript(() => {
+    const original = MediaDevices.prototype.getUserMedia;
+    MediaDevices.prototype.getUserMedia = async function (options) {
+      try { return await original.call(this, options); } catch {
+        const audio = new AudioContext(), tone = audio.createOscillator(), output = audio.createMediaStreamDestination();
+        tone.connect(output); tone.start(); return output.stream;
+      }
+    };
+  });
   await page.route('**/api/dictation', route => route.fulfill({ json: { available: true, provider: 'local', maxSeconds: 120, maxBytes: 8388608 } }));
   let selectedProvider = 'local';
   await page.unroute('**/api/dictation');

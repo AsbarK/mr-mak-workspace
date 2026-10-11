@@ -1,19 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 - Unreleased
 
-- Start agent chats and the terminal through the full Windows PowerShell path, so they still open when PowerShell's folder is missing from PATH.
-- Use fixed local Michael (US male) and Emma (UK female) voices for mobile Read aloud instead of browser voice lists.
-
-- Open shared images in a full-screen viewer with image-only pinch zoom/pan, and read agent replies aloud using available device voices.
-
-- Show shared conversation images on mobile with an enlarged preview and downloads through paired, scoped image access.
-
-- Mobile Recent activity starts collapsed and expands with a tap, keeping conversation messages in view.
-
-- Add free local Whisper dictation on desktop and mobile, shared Free/Paid provider settings in Phone settings, and direct desktop terminal insertion without automatic submission. Default terminal appearance to Original CLI colors.
-
-## 0.5.1 - 2026-10-09
+- Improve macOS support: native app/DMG packaging, Finder and Dock behavior, Command-key shortcuts, drag and drop, microphone permission and a bundled Node runtime. A login-shell timeout keeps launch responsive. CI archives retain executable permissions.
+- Start Windows agent chats through the full PowerShell path, even when its folder is missing from PATH.
+- Support CLI selection copy through OSC 52 after a foreground selection or Copy gesture. Background output and clipboard read requests are rejected.
+- Add `Setup.ps1 -Mode Update` for source builds. Run it in an external PowerShell window; it waits for you to quit, preserves custom installation folders and restarts the same repository.
+- Improve mobile navigation and reconnect after sleep. Keep independent chat, report tab and scroll positions, including after reload. A message can reference the current report without attaching its contents.
+- Preview and download shared conversation images and videos through paired, scoped access. Images support zoom and pan. Recent activity starts collapsed.
+- Add optional local Whisper dictation on desktop and mobile, with one provider setting and recoverable recordings. Desktop dictation inserts text without pressing Enter. Updates preserve existing providers, models and appearance choices.
+- Add optional local Read aloud with Michael and Emma voices. Cross-platform Python setup uses pinned model files and SHA-256 checks. No models are downloaded at app startup, and no cloud fallback is automatic.
 
 - Click a card's status dot in the desktop Workspace to set Active, Done or Archived, change its category, or pin it. Changes save immediately; archived cards keep their files and can be restored through search or Show archive.
 - Retry card saves when Windows briefly locks the registry, preserving the latest metadata and cleaning up unsuccessful temporary writes.

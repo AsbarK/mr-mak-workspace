@@ -9,6 +9,7 @@ import ChatTabs from './ChatTabs'
 import { orderedChats, tabColors } from './chatOrder'
 import MobileAccess from './MobileAccess'
 import DictationComposer from './DictationComposer'
+import { isMac, isWindows, modKey, modLabel, shortcutLabel } from './platform'
 
 function NewChat({ close }: { close: () => void }) {
   const state = useDesktop()

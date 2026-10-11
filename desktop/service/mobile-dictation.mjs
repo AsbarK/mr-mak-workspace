@@ -22,8 +22,19 @@ export class MobileDictation {
     const openai = keys.OPENAI_API_KEY || keys.OPENAI_KEY;
     const provider = this.providerChoice() || keys.MRMAK_TRANSCRIBE_PROVIDER?.trim().toLowerCase() || 'local';
     const key = provider === 'openrouter' ? router : provider === 'openai' ? openai : null;
-    const modelOverride = !this.providerChoice() || keys.MRMAK_TRANSCRIBE_PROVIDER?.trim().toLowerCase() === provider ? keys.MRMAK_TRANSCRIBE_MODEL?.trim() : null;
+    const configuredProvider = keys.MRMAK_TRANSCRIBE_PROVIDER?.trim().toLowerCase() || (router ? 'openrouter' : 'openai');
+    const modelOverride = configuredProvider === provider ? keys.MRMAK_TRANSCRIBE_MODEL?.trim() : null;
     return { provider, key, local: localConfig(this.repo, keys), model: modelOverride || (provider === 'openrouter' ? 'openai/gpt-4o-transcribe' : 'gpt-4o-transcribe') };
+  }
+  async initializeProvider(settings, existing) {
+    if (['local', 'openai', 'openrouter', 'off'].includes(settings.transcribeProvider)) return false;
+    const keys = { ...this.env, ...parse(await readFile(path.join(this.repo, '.env'), 'utf8').catch(() => '')) };
+    const explicit = keys.MRMAK_TRANSCRIBE_PROVIDER?.trim().toLowerCase();
+    // Preserve the effective pre-0.5.1 provider. New installations never choose
+    // a billed service merely because an API key exists for another feature.
+    const previous = keys.OPENROUTER_API_KEY || keys.OPENROUTER_KEY ? 'openrouter' : keys.OPENAI_API_KEY || keys.OPENAI_KEY ? 'openai' : 'off';
+    settings.transcribeProvider = explicit ? (['local', 'openai', 'openrouter', 'off'].includes(explicit) ? explicit : 'off') : existing ? previous : 'local';
+    return true;
   }
   async status() {
     const config = await this.config();

@@ -62,18 +62,38 @@ Reading a completed turn marks it seen across devices.
 
 ## Voice input
 
-1. On the computer, run `powershell -ExecutionPolicy Bypass -File scripts/setup-local-dictation.ps1` once from the repository. It installs an isolated Python environment and downloads the multilingual Whisper small model into ignored `.cache/dictation`.
+1. On the computer, complete the optional [local voice setup](#local-voice-setup-on-the-computer), or select your existing paid provider in Phone settings.
 2. Open a chat on the phone and tap the microphone beside the attachment button.
    Allow microphone access. Use the private HTTPS page in Chrome or Safari.
 3. Speak, then tap **Stop**. Each recording is limited to two minutes.
 4. Review or edit the text, then press **Send** yourself.
 
-The default is free local Whisper on your computer, using CPU int8. The phone
+Fresh installations default to free local Whisper on your computer, using CPU int8.
+Updates retain your previous provider and model. The phone
 uploads audio over the paired private connection; transcription runs offline on
 the computer after setup. No transcription API key or credit is needed. The PC
 must remain running and reachable. Temporary server audio is removed after each
 attempt. Recordings that have not yet become text remain recoverable on the
 recording device until transcribed or discarded.
+
+### Local voice setup on the computer
+
+Install Python 3.10-3.12 (3.12 recommended). From the repository folder on
+Windows, use these commands; on macOS/Linux, replace `python` with `python3`:
+
+```sh
+python scripts/setup-local-voice.py dictation
+python scripts/setup-local-voice.py read-aloud
+```
+
+Each command is optional. It creates a separate environment under `.cache`,
+installs pinned Python packages and verifies the model files against SHA-256
+checksums. Whisper's model download is about 486 MB; the reading model and
+voices total about 142 MB, plus Python dependencies. Setup checks that the
+model can load on your computer. It does not restart Mr. Mak. Refresh Phone
+settings afterward and select your provider. Windows PowerShell wrappers
+`setup-local-dictation.ps1` and `setup-local-read-aloud.ps1` call the same setup.
+Nothing is downloaded automatically by opening the app.
 
 Desktop chats offer a microphone in the chat toolbar. Transcription pastes
 directly into the terminal input without pressing Enter. The Workspace's Mak composer
@@ -195,7 +215,7 @@ already playing; tap Read aloud again to include them.
 Speech is generated locally on your computer with Kokoro ONNX. Phone settings
 has exactly Michael (US man) and Emma (UK woman); the choice is saved on that
 phone. Browser voice lists and other accents are not used. No API key or paid
-speech provider is required. Run `scripts/setup-local-read-aloud.ps1` once on
+speech provider is required. Run `python scripts/setup-local-voice.py read-aloud` (`python3` on macOS/Linux) once on
 Windows to install an isolated CPU environment and download the official model.
 After setup, inference is offline; text/audio are not sent to a cloud provider.
 The phone receives short WAV segments through its paired, authenticated session.

@@ -8,6 +8,7 @@ import { Icon } from './Icons'
 import type { AgentId } from './types'
 import { decorateTerminal, focusTheme, originalTheme, type TerminalAppearance } from './terminalAppearance'
 import { fileManager, isMac, modKey, modLabel } from './platform'
+import { terminalClipboardGate } from './terminalClipboard'
 
 export default function TerminalPane({ id, agent, fontSize, appearance, onAttachmentStatus }: { id: string; agent: AgentId; fontSize: number; appearance: TerminalAppearance; onAttachmentStatus: (id: string, text: string) => void }) {
   const host = useRef<HTMLDivElement>(null)
@@ -92,15 +93,25 @@ export default function TerminalPane({ id, agent, fontSize, appearance, onAttach
     let sequence = -1
     let ready = false
     let queued: { sequence: number; data: string }[] = []
-    // Agent TUIs copy their own mouse selection with OSC 52 ("c;<base64>").
-    // Write-only: a program may set the clipboard but never read it back.
+    const clipboardGate = terminalClipboardGate(), element = host.current
+    let pointer: { x: number; y: number } | null = null
+    const selectionStart = (event: PointerEvent) => { pointer = event.isTrusted && event.button === 0 ? { x: event.clientX, y: event.clientY } : null }
+    const selectionEnd = (event: PointerEvent) => {
+      if (pointer && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 3) clipboardGate.arm(event.isTrusted)
+      pointer = null
+    }
+    const copyGesture = (event: KeyboardEvent) => { if (modKey(event) && event.key.toLowerCase() === 'c') clipboardGate.arm(event.isTrusted) }
+    const multipleClick = (event: MouseEvent) => { if (event.detail >= 2) clipboardGate.arm(event.isTrusted) }
+    const cancelCopy = () => { pointer = null; clipboardGate.clear() }
+    element.addEventListener('pointerdown', selectionStart, true)
+    element.addEventListener('pointerup', selectionEnd, true)
+    element.addEventListener('keydown', copyGesture, true)
+    element.addEventListener('click', multipleClick, true)
+    window.addEventListener('blur', cancelCopy)
+    document.addEventListener('visibilitychange', cancelCopy)
     const clipboard = terminal.parser.registerOscHandler(52, data => {
-      const payload = data.slice(data.indexOf(';') + 1)
-      if (!ready || !data.includes(';') || !payload || payload === '?' || payload.length > 4 * 1024 * 1024) return true
-      try {
-        const text = new TextDecoder().decode(Uint8Array.from(atob(payload), char => char.charCodeAt(0)))
-        navigator.clipboard.writeText(text).catch(reportError)
-      } catch { /* Malformed clipboard data is not copied. */ }
+      const text = clipboardGate.read(data, ready, document.visibilityState === 'visible' && document.hasFocus() && element.contains(document.activeElement))
+      if (text !== null) navigator.clipboard.writeText(text).catch(reportError)
       return true
     })
     const resize = () => {
@@ -171,13 +182,19 @@ export default function TerminalPane({ id, agent, fontSize, appearance, onAttach
       const text = event.clipboardData.getData('text/plain')
       if (text) terminal.paste(text)
     }
-    const element = host.current
     element.addEventListener('paste', paste, true)
     const observer = new ResizeObserver(resize); observer.observe(host.current)
     subscribe()
     const focus = () => terminal.focus()
     window.addEventListener('focus', focus)
-    return () => { off(); input.dispose(); clipboard.dispose(); observer.disconnect(); element.removeEventListener('paste', paste, true); window.removeEventListener('focus', focus); clearTimeout(statusTimer.current); onAttachmentStatus(id, ''); terminal.dispose(); terminalRef.current = null; fitRef.current = null }
+    return () => {
+      off(); input.dispose(); clipboard.dispose(); observer.disconnect()
+      element.removeEventListener('pointerdown', selectionStart, true); element.removeEventListener('pointerup', selectionEnd, true); element.removeEventListener('keydown', copyGesture, true)
+      element.removeEventListener('click', multipleClick, true)
+      window.removeEventListener('blur', cancelCopy); document.removeEventListener('visibilitychange', cancelCopy)
+      element.removeEventListener('paste', paste, true); window.removeEventListener('focus', focus); clearTimeout(statusTimer.current)
+      onAttachmentStatus(id, ''); terminal.dispose(); terminalRef.current = null; fitRef.current = null
+    }
   }, [id, agent, onAttachmentStatus])
   useEffect(() => {
     const terminal = terminalRef.current

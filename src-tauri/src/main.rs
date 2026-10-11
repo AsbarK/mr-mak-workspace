@@ -208,17 +208,8 @@ fn make_windows(app: &tauri::AppHandle, workspace: &str, chats: &str) -> Result<
     Ok(())
 }
 
-// Apps opened from Finder or the Dock get a minimal PATH, so the service could not
-// find node, claude, codex or opencode. Ask the user's login shell for its PATH.
-#[cfg(target_os = "macos")]
-fn login_shell_path() -> Option<String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-    let output = Command::new(shell).args(["-ilc", "printf '__MRMAK_PATH__%s' \"$PATH\""])
-        .stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
-    let text = String::from_utf8(output.stdout).ok()?;
-    let path = text.rsplit("__MRMAK_PATH__").next()?.trim().to_owned();
-    if text.contains("__MRMAK_PATH__") && !path.is_empty() { Some(path) } else { None }
-}
+#[cfg(unix)]
+mod login_path;
 
 #[cfg(target_os = "macos")]
 fn recall_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
@@ -292,7 +283,7 @@ fn main() {
             command.arg(script).arg("--repo").arg(&repo).arg("--ui").arg(ui).current_dir(&repo)
                 .env("MRMAK_PARENT_PID", std::process::id().to_string()).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::from(log));
             #[cfg(target_os = "macos")]
-            if let Some(path) = login_shell_path() { command.env("PATH", path); }
+            command.env("PATH", login_path::discover());
             let mut child = hidden(&mut command).spawn()?;
             // The job contains only this app's service and descendants. Quitting
             // or a host crash cannot leave managed CLI/MCP processes behind.

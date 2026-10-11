@@ -11,9 +11,17 @@ context, credentials or agent conversations.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
-For a desktop build from source, `Setup.ps1 -Mode Update` replaces these steps:
+For a desktop build from source, run `Setup.ps1 -Mode Update` in an external
+Windows PowerShell window opened from Start, outside Mr. Mak. It replaces these steps:
 it builds the current source, waits for you to quit Mr. Mak, installs the build
 silently and starts Mr. Mak again. See [getting started](getting-started.md).
+
+The 0.5.1 source update preserves your selected dictation provider, custom model
+and terminal appearance. Fresh setups default to local Whisper, which requires
+the optional [local voice setup](mobile-access.md#local-voice-setup-on-the-computer).
+OpenAI and OpenRouter remain explicit paid choices; a missing local model never
+causes an automatic cloud request. New mobile media previews, report-position
+restore and desktop dictation are included alongside the macOS port.
 
 Version 0.5.0 adds optional [mobile access](mobile-access.md). After updating,
 use the phone button in Chats to connect your own devices through Tailscale.

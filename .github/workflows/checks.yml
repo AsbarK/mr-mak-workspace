@@ -21,12 +21,16 @@ jobs:
       - run: npm run test:preview
       - run: node desktop/service/test/theme-ui.mjs
       - run: node desktop/service/test/voice-ui.mjs
+      - run: node desktop/service/test/clipboard-ui.mjs
+      - run: node desktop/service/test/desktop-dictation-ui.mjs
+      - run: powershell -NoProfile -File scripts/test-update-helpers.ps1
       - run: node desktop/service/test/mobile-ui.mjs
       - run: node desktop/service/test/workspace-edit-ui.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s .agents/skills/fal-ai-generation/scripts -p test_fal_job.py -v
+      - run: python scripts/test-local-voice-setup.py
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -43,6 +47,8 @@ jobs:
       - run: npm run test:template
       - run: npm run build
       - run: npm run desktop:build:appimage
+      - run: cargo test --manifest-path src-tauri/Cargo.toml login_path::tests
+      - run: python3 scripts/test-local-voice-setup.py
       - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
@@ -72,10 +78,19 @@ jobs:
       - run: node desktop/service/test/mobile-ui.mjs
       - run: node desktop/service/test/workspace-edit-ui.mjs
       - run: npm run desktop:build -- --bundles app
+      - run: cargo test --manifest-path src-tauri/Cargo.toml login_path::tests
+      - run: node desktop/service/test/clipboard-ui.mjs
+      - run: node desktop/service/test/desktop-dictation-ui.mjs
+      - run: python3 scripts/test-local-voice-setup.py
+      - name: Verify packaged Node and native terminals
+        run: '"src-tauri/target/release/bundle/macos/Mr. Mak Workspace.app/Contents/Resources/runtime/node" scripts/check-bundled-runtime.mjs'
+      - name: Archive macOS app with executable permissions
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "src-tauri/target/release/bundle/macos/Mr. Mak Workspace.app" mr-mak-workspace-macos.zip
       - name: Upload macOS app
         uses: actions/upload-artifact@v4
         with:
           name: mr-mak-workspace-macos-app
-          path: src-tauri/target/release/bundle/macos/*.app
+          path: mr-mak-workspace-macos.zip
           if-no-files-found: error
           retention-days: 14

@@ -1,7 +1,19 @@
 [CmdletBinding()]
-param([ValidateSet('Check', 'Preview', 'Desktop', 'Update')][string]$Mode = 'Check')
+param([ValidateSet('Check', 'Preview', 'Desktop', 'Update')][string]$Mode = 'Check', [string]$InstallDirectory)
 $ErrorActionPreference = 'Stop'
 $taskRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
+. (Join-Path $taskRoot 'scripts/update-helpers.ps1')
+# Quitting the app terminates its entire managed process tree, including an
+# updater launched in its terminal. Reject before building or installing.
+if ($Mode -eq 'Update') {
+  $taskProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+  if ($env:MRMAK_PARENT_PID -or (Test-MakAncestor $taskProcesses $PID)) {
+    throw 'Run Setup.ps1 -Mode Update in a separate Windows PowerShell window opened from Start, outside Mr. Mak. Quitting Mr. Mak would stop an updater launched in its chat.'
+  }
+  if (-not $InstallDirectory) { $InstallDirectory = Get-MakInstallDirectory }
+  $InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory)
+  if ($InstallDirectory.Contains('"')) { throw 'The installation folder cannot contain quotes.' }
+}
 Push-Location -LiteralPath $taskRoot
 try {
   if (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'workspace/workspace.json'))) {
@@ -44,28 +56,34 @@ try {
       Write-Host 'Run the installer, then double-click Start Mr. Mak.cmd.'
       exit 0
     }
-    $taskVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'package.json') -Raw | ConvertFrom-Json).version
+    $taskVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'src-tauri/tauri.conf.json') -Raw | ConvertFrom-Json).version
     $taskSetup = Get-ChildItem -LiteralPath $taskBundle -Filter ('*_' + $taskVersion + '_*-setup.exe') |
       Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $taskSetup) { throw ('No ' + $taskVersion + ' installer was found in ' + $taskBundle + '.') }
     # The silent installer closes a running app without asking, and agents may
     # still be working in it. Wait until the owner quits Mr. Mak and its service.
-    $taskInstall = Join-Path $env:LOCALAPPDATA 'Mr. Mak Workspace'
-    $taskRunning = {
-      foreach ($taskProcess in Get-Process -ErrorAction SilentlyContinue) {
-        if ($taskProcess.Name -eq 'mrmak-workspace') { return $true }
-        if ($taskProcess.Path -and $taskProcess.Path.StartsWith($taskInstall + '\', [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    $taskInstallDirectories = @($InstallDirectory)
+    # Include custom installations already running, even if their service takes
+    # a moment to exit after the native window disappears. Never kill processes.
+    foreach ($taskProcess in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
+      if ((Test-MakAppProcess $taskProcess) -and $taskProcess.ExecutablePath) {
+        $taskInstallDirectories += Split-Path -Parent $taskProcess.ExecutablePath
       }
-      return $false
+    }
+    $taskRunning = {
+      return @(Get-MakUpdateProcesses @(Get-CimInstance Win32_Process -ErrorAction Stop) $taskInstallDirectories).Count -gt 0
     }
     if (& $taskRunning) {
       Write-Host 'Finish active agent tasks, then choose Quit from the Mr. Mak tray menu. Setup continues by itself.'
       while (& $taskRunning) { Start-Sleep -Seconds 2 }
     }
     Write-Host ('Installing ' + $taskSetup.Name)
-    $taskInstaller = Start-Process -FilePath $taskSetup.FullName -ArgumentList '/S' -Wait -PassThru
+    # NSIS requires /D to be last and unquoted, including paths with spaces.
+    $taskInstaller = Start-Process -FilePath $taskSetup.FullName -ArgumentList @('/S', ('/D=' + $InstallDirectory)) -WindowStyle Hidden -Wait -PassThru
     if ($taskInstaller.ExitCode -ne 0) { throw ('The installer stopped with code ' + $taskInstaller.ExitCode + '. Run it from ' + $taskBundle + ' to see its message.') }
     Write-Host 'Installed. Starting Mr. Mak.'
-    Start-Process -FilePath (Join-Path $taskRoot 'Start Mr. Mak.cmd') -WorkingDirectory $taskRoot
+    $taskApp = Join-Path $InstallDirectory 'mrmak-workspace.exe'
+    if (-not (Test-Path -LiteralPath $taskApp)) { throw ('The installed app was not found in ' + $InstallDirectory + '. Open the installer to inspect its destination.') }
+    Start-Process -FilePath $taskApp -ArgumentList @('--repo', ('"' + $taskRoot + '"')) -WorkingDirectory $taskRoot -WindowStyle Hidden
   }
 } finally { Pop-Location }

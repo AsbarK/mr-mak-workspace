@@ -163,9 +163,13 @@ interrupting active chats with an install or restart.
 powershell -ExecutionPolicy Bypass -File .\Setup.ps1 -Mode Update
 ```
 
-Update runs the same build, then waits until you quit Mr. Mak from its tray
-menu. It installs the new build silently and starts Mr. Mak again. It never
-closes the app itself, so finish active chats before quitting.
+Run Update in a separate Windows PowerShell window opened from Start, outside
+Mr. Mak. An updater inside a managed chat would stop when you quit the app;
+Setup detects that case before building. Update waits for you to quit from the
+tray, checks that the bundled service has exited, installs the build silently
+and opens the same repository again. Finish active chats before quitting.
+The registered installation folder is reused. Pass `-InstallDirectory 'D:\Apps\Mr. Mak Workspace'`
+if you need to choose it explicitly. The update never terminates your chats itself.
 
 For a report-only browser preview, only Node.js 22.20+ and npm are needed beyond
 the CLI prerequisite above. **Rust, Cargo and C++ Build Tools are not required

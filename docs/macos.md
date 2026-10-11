@@ -2,8 +2,9 @@
 
 The desktop app was built for Windows (and Linux). This document covers the macOS port:
 what changed, how to build and run it, how it was verified, and what is still open.
-Status (2026-10-11): runs as a native `Mr. Mak Workspace.app` on Apple Silicon; all
-automated suites and the native checks pass.
+The contributor reports native Apple Silicon operation and the checks below
+for PR #25. The combined 0.5.1 update adds CI verification and a bounded login-shell
+probe; its build status is tracked by the repository's Checks workflow.
 
 ## Build and run
 
@@ -31,7 +32,7 @@ Development: `./node_modules/.bin/tauri dev -- -- --repo "$PWD"`. Without `--rep
 | Change | Why |
 |---|---|
 | `app` and `dmg` bundle targets, `icons/icon.icns`, `Info.plist` with `NSMicrophoneUsageDescription` | Mac packaging; voice needs a microphone usage string |
-| Login-shell `PATH` for the service (`login_shell_path`) | Apps started from Finder/Dock get a minimal `PATH` and would not find `node`, `claude`, `codex` |
+| Login-shell `PATH` for the service | Finder/Dock launches can find installed CLIs; after two seconds an unresponsive shell falls back to the inherited PATH plus common CLI folders |
 | `mac_key.rs`: ⌃⌥Space recall shortcut (`tauri-plugin-global-shortcut`), shared with the Win-key setting | macOS counterpart of the Win-key recall |
 | `RunEvent::Reopen` brings both windows back | Closing a window only hides it; a Dock click must restore it |
 | Native file drag-out enabled on macOS (`drag` crate) | Drag files from Workspace to Finder and other apps |
