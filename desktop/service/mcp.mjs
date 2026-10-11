@@ -72,13 +72,13 @@ export class McpInventory {
       add(client, 'global', paths[`${client}User`], values[`${client}User`].mcpServers, 10);
       add(client, 'project', paths[`${client}Project`], values[`${client}Project`].mcpServers, 20);
     }
-    if (process.platform === 'win32') {
-      const managedPath = path.join(this.env.ProgramFiles || 'C:/Program Files', 'ClaudeCode/managed-mcp.json');
-      const managed = await read(managedPath);
-      if (managed.mcpServers) {
-        for (const entry of entries) if (entry.client === 'claude') entry.restricted = true;
-        add('claude', 'managed', managedPath, managed.mcpServers, 100, { managed: true });
-      }
+    // Claude Code's administrator-managed MCP file lives in a fixed system location per platform.
+    const managedPath = process.platform === 'win32' ? path.join(this.env.ProgramFiles || 'C:/Program Files', 'ClaudeCode/managed-mcp.json')
+      : process.platform === 'darwin' ? '/Library/Application Support/ClaudeCode/managed-mcp.json' : '/etc/claude-code/managed-mcp.json';
+    const managed = await read(managedPath);
+    if (managed.mcpServers) {
+      for (const entry of entries) if (entry.client === 'claude') entry.restricted = true;
+      add('claude', 'managed', managedPath, managed.mcpServers, 100, { managed: true });
     }
     // Inspect declared installed plugins only. A downloaded cache is not proof
     // that a plugin is enabled. Never copy or launch host-owned transports.

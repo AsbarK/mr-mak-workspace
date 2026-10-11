@@ -50,3 +50,32 @@ jobs:
           path: src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
           retention-days: 14
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:template
+      - run: npm run build
+      # The macOS app renders with WKWebView, so its UI checks run in WebKit.
+      - run: npx playwright install webkit
+      - run: npm run test:preview
+      - run: node desktop/service/test/theme-ui.mjs
+      - run: node desktop/service/test/voice-ui.mjs
+      - run: node desktop/service/test/mobile-ui.mjs
+      - run: node desktop/service/test/workspace-edit-ui.mjs
+      - run: npm run desktop:build -- --bundles app
+      - name: Upload macOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: mr-mak-workspace-macos-app
+          path: src-tauri/target/release/bundle/macos/*.app
+          if-no-files-found: error
+          retention-days: 14

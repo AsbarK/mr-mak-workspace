@@ -16,6 +16,18 @@ struct ServiceJob(Mutex<Option<OwnedHandle>>);
 mod window_identity;
 #[cfg(windows)]
 mod win_key;
+#[cfg(target_os = "macos")]
+mod mac_key;
+
+// The "recall Mr. Mak" shortcut: a bare Win-key tap on Windows, ⌃⌥Space on macOS.
+#[cfg(windows)]
+type RecallShortcut = win_key::WinKeyShortcut;
+#[cfg(target_os = "macos")]
+type RecallShortcut = mac_key::RecallShortcut;
+#[cfg(windows)]
+const RECALL_LABEL: &str = "Win key";
+#[cfg(target_os = "macos")]
+const RECALL_LABEL: &str = mac_key::LABEL;
 
 #[cfg(windows)]
 fn process_job(child: &Child) -> Result<OwnedHandle, Box<dyn std::error::Error>> {
@@ -59,32 +71,35 @@ fn recall_open_windows(app: &tauri::AppHandle) {
     reveal(app, "chats");
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn publish_shortcut(app: &tauri::AppHandle, request_id: Option<&str>, error: Option<String>) {
-    let available = app.try_state::<win_key::WinKeyShortcut>().is_some();
-    let enabled = app.try_state::<win_key::WinKeyShortcut>().is_some_and(|shortcut| shortcut.enabled());
+    let available = app.try_state::<RecallShortcut>().is_some();
+    let enabled = app.try_state::<RecallShortcut>().is_some_and(|shortcut| shortcut.enabled());
     if let Some(item) = app.try_state::<CheckMenuItem<tauri::Wry>>() { let _ = item.set_checked(enabled); }
-    let event = serde_json::json!({ "type": "native-settings", "requestId": request_id, "available": available, "winKey": enabled && available, "error": error });
+    let event = serde_json::json!({ "type": "native-settings", "requestId": request_id, "available": available, "winKey": enabled && available, "label": RECALL_LABEL, "error": error });
     if let Some(child) = app.state::<Service>().0.lock().unwrap().as_mut() {
         if let Some(stdin) = child.stdin.as_mut() { let _ = writeln!(stdin, "{event}"); }
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn set_shortcut(app: &tauri::AppHandle, enabled: bool, request_id: Option<&str>) {
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        let shortcut = app.try_state::<win_key::WinKeyShortcut>().ok_or("Windows shortcut unavailable")?;
+        let shortcut = app.try_state::<RecallShortcut>().ok_or("Shortcut unavailable")?;
         let folder = app.path().app_config_dir()?;
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("windows-key.json"), if enabled { "true" } else { "false" })?;
+        #[cfg(windows)]
         shortcut.set_enabled(enabled);
+        #[cfg(target_os = "macos")]
+        shortcut.set_enabled(enabled)?;
         if let Some(item) = app.try_state::<CheckMenuItem<tauri::Wry>>() { item.set_checked(enabled)?; }
         Ok(())
     })();
     publish_shortcut(app, request_id, result.err().map(|error| error.to_string()));
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn start_file_drag(app: &tauri::AppHandle, paths: Vec<PathBuf>) {
     let Some(window) = app.get_webview_window("workspace") else { return };
     let _ = app.run_on_main_thread(move || {
@@ -193,6 +208,60 @@ fn make_windows(app: &tauri::AppHandle, workspace: &str, chats: &str) -> Result<
     Ok(())
 }
 
+// Apps opened from Finder or the Dock get a minimal PATH, so the service could not
+// find node, claude, codex or opencode. Ask the user's login shell for its PATH.
+#[cfg(target_os = "macos")]
+fn login_shell_path() -> Option<String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let output = Command::new(shell).args(["-ilc", "printf '__MRMAK_PATH__%s' \"$PATH\""])
+        .stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    let path = text.rsplit("__MRMAK_PATH__").next()?.trim().to_owned();
+    if text.contains("__MRMAK_PATH__") && !path.is_empty() { Some(path) } else { None }
+}
+
+#[cfg(target_os = "macos")]
+fn recall_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    use tauri_plugin_global_shortcut::ShortcutState;
+    tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
+        if event.state() == ShortcutState::Pressed { recall_all_windows(app); }
+    }).build()
+}
+
+// Windows and Linux have nothing to register here; keep the builder chain uniform.
+#[cfg(not(target_os = "macos"))]
+fn recall_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> { tauri::plugin::Builder::new("mrmak-recall").build() }
+
+// macOS: the recall shortcut and a Dock-icon click bring back both windows,
+// since closing a window there only hides it.
+#[cfg(target_os = "macos")]
+fn recall_all_windows(app: &tauri::AppHandle) {
+    let any_visible = ["workspace", "chats"].iter().any(|label| app.get_webview_window(label).is_some_and(|w| w.is_visible().unwrap_or(false)));
+    if any_visible { recall_open_windows(app); } else { reveal(app, "workspace"); reveal(app, "chats"); }
+}
+
+// macOS: the web view never receives Cmd+1…9 (the native window consumes them
+// before the page), so chat switching lives in a Chats menu, as in other Mac
+// apps. Selecting an item shows Chats and asks the page to open that tab.
+#[cfg(target_os = "macos")]
+fn install_chats_menu(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::Submenu;
+    let menu = Menu::default(app)?;
+    let items = (1..=9).map(|n| MenuItem::with_id(app, format!("chat-{n}"), format!("Chat {n}"), true, Some(format!("CmdOrCtrl+{n}"))))
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = items.iter().map(|item| item as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
+    menu.append(&Submenu::with_items(app, "Chats", true, &refs)?)?;
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, event| {
+        let Some(index) = event.id.as_ref().strip_prefix("chat-").and_then(|n| n.parse::<u8>().ok()) else { return };
+        reveal(app, "chats");
+        if let Some(window) = app.get_webview_window("chats") {
+            let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('mrmak-select-chat',{{detail:{{index:{index}}}}}))"));
+        }
+    });
+    Ok(())
+}
+
 fn main() {
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -200,6 +269,7 @@ fn main() {
             else if let Some(label) = requested_window(&args) { reveal(app, label); }
             else { reveal(app, "workspace"); reveal(app, "chats"); }
         }))
+        .plugin(recall_plugin())
         .plugin(tauri_plugin_window_state::Builder::default().with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED).build())
         .manage(Service(Mutex::new(None)))
         .setup(|app| {
@@ -221,6 +291,8 @@ fn main() {
             let mut command = Command::new(node);
             command.arg(script).arg("--repo").arg(&repo).arg("--ui").arg(ui).current_dir(&repo)
                 .env("MRMAK_PARENT_PID", std::process::id().to_string()).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::from(log));
+            #[cfg(target_os = "macos")]
+            if let Some(path) = login_shell_path() { command.env("PATH", path); }
             let mut child = hidden(&mut command).spawn()?;
             // The job contains only this app's service and descendants. Quitting
             // or a host crash cannot leave managed CLI/MCP processes behind.
@@ -233,7 +305,7 @@ fn main() {
                 for line in BufReader::new(stdout).lines().map_while(Result::ok) {
                     let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
                     match event["type"].as_str().unwrap_or("") {
-                        #[cfg(windows)]
+                        #[cfg(any(windows, target_os = "macos"))]
                         "native-settings" => {
                             if let Some(enabled) = event["winKey"].as_bool() {
                                 let handle = app_handle.clone();
@@ -277,7 +349,7 @@ fn main() {
                                 }
                             }
                         },
-                        #[cfg(windows)]
+                        #[cfg(any(windows, target_os = "macos"))]
                         "drag-files" => {
                             if let Some(paths) = event["paths"].as_array() {
                                 let paths: Vec<PathBuf> = paths.iter().filter_map(|p| p.as_str().map(PathBuf::from)).collect();
@@ -303,30 +375,32 @@ fn main() {
                     app_handle.exit(1);
                 }
             });
+            #[cfg(target_os = "macos")]
+            install_chats_menu(app.handle())?;
             let workspace_item = MenuItem::with_id(app, "workspace", "Show Workspace", true, None::<&str>)?;
             let chats_item = MenuItem::with_id(app, "chats", "Show Chats", true, None::<&str>)?;
             let both_item = MenuItem::with_id(app, "both", "Show both windows", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Mr. Mak and stop terminals", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let menu = Menu::with_items(app, &[&workspace_item, &chats_item, &both_item, &separator, &quit_item])?;
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             {
                 let preference = app.path().app_config_dir()?.join("windows-key.json");
                 let enabled = fs::read_to_string(&preference).ok().and_then(|text| serde_json::from_str::<bool>(&text).ok()).unwrap_or(false);
-                let shortcut = win_key::WinKeyShortcut::start(app.handle(), enabled);
+                let shortcut = RecallShortcut::start(app.handle(), enabled);
                 let available = shortcut.is_ok();
                 if let Ok(shortcut) = shortcut { app.manage(shortcut); }
-                let item = CheckMenuItem::with_id(app, "win-key", "Win key shows Mr. Mak", available, enabled && available, None::<&str>)?;
+                let item = CheckMenuItem::with_id(app, "win-key", format!("{RECALL_LABEL} shows Mr. Mak"), available, enabled && available, None::<&str>)?;
                 menu.insert(&item, 3)?;
                 app.manage(item);
-                publish_shortcut(app.handle(), None, if available { None } else { Some("Windows could not register the shortcut.".into()) });
+                publish_shortcut(app.handle(), None, if available { None } else { Some(format!("The system could not register {RECALL_LABEL}.")) });
             }
             TrayIconBuilder::new().icon(app.default_window_icon().unwrap().clone()).tooltip("Mr. Mak — your agents, close at hand")
                 .menu(&menu).show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "workspace" => reveal(app, "workspace"), "chats" => reveal(app, "chats"),
                     "both" => { reveal(app, "workspace"); reveal(app, "chats"); }, "quit" => app.exit(0),
-                    #[cfg(windows)]
+                    #[cfg(any(windows, target_os = "macos"))]
                     "win-key" => {
                         if let Some(item) = app.try_state::<CheckMenuItem<tauri::Wry>>() {
                             if let Ok(enabled) = item.is_checked() {
@@ -342,6 +416,8 @@ fn main() {
         }).build(tauri::generate_context!());
     match result {
         Ok(app) => app.run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event { recall_all_windows(app); }
             if let tauri::RunEvent::Exit = event {
                 #[cfg(windows)]
                 if let Some(shortcut) = app.try_state::<win_key::WinKeyShortcut>() { shortcut.shutdown(); }

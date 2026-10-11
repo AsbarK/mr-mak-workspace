@@ -120,7 +120,8 @@ On Windows, download the installer from [Releases](https://github.com/witnesstod
 install **Mr. Mak Workspace**, then open **Start Mr. Mak.cmd** in your cloned
 repository. On Linux, build the Tauri desktop target after installing the Node,
 Rust and WebKitGTK prerequisites, then launch the resulting AppImage/deb install
-with `--repo /path/to/your/workspace`. On both systems, use **+** in Chats to
+with `--repo /path/to/your/workspace`. On macOS, run `./setup.sh desktop` to build `Mr. Mak Workspace.app`, then open
+**Start Mr. Mak.command** ([macOS notes](docs/getting-started.md#macos)). On every system, use **+** in Chats to
 open an installed CLI and sign in with your own account.
 
 The installer includes the local Node service. It does not include Codex,
