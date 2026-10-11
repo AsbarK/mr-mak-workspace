@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use fixed local Michael (US male) and Emma (UK female) voices for mobile Read aloud instead of browser voice lists.
+
 - Open shared images in a full-screen viewer with image-only pinch zoom/pan, and read agent replies aloud using available device voices.
 
 - Show shared conversation images on mobile with an enlarged preview and downloads through paired, scoped image access.

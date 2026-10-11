@@ -192,10 +192,16 @@ media. Tap it to read; during playback it becomes Pause/Resume, with a Stop icon
 It reads your most recent message and all following agent messages through that
 reply, with Pause, Resume and Stop controls. New replies do not extend speech
 already playing; tap Read aloud again to include them.
-Speech uses the browser/device voice service and needs no Mr. Mak API key or paid
-provider. Phone settings has up to two English voice choices, saved on that phone.
-On-device voices are preferred. If none are listed, playback requests the device’s
-English default; install an English voice in phone speech settings to choose one.
-Voice availability and offline operation depend on the device voice service.
-Code blocks, inline code and tables are skipped. Playback starts only after a tap,
-and stops when changing chats, opening Terminal or leaving Conversation.
+Speech is generated locally on your computer with Kokoro ONNX. Phone settings
+has exactly Michael (US man) and Emma (UK woman); the choice is saved on that
+phone. Browser voice lists and other accents are not used. No API key or paid
+speech provider is required. Run `scripts/setup-local-read-aloud.ps1` once on
+Windows to install an isolated CPU environment and download the official model.
+After setup, inference is offline; text/audio are not sent to a cloud provider.
+The phone receives short WAV segments through its paired, authenticated session.
+Audio and text are kept in memory and discarded after playback. Stop cancels
+in-progress synthesis; disconnecting the phone revokes it. Code, tables and
+images are skipped. Playback starts only after a tap and stops when changing
+chats, opening Terminal or leaving Conversation.
+
+Voice definitions: [Kokoro voice catalogue](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readingVoiceChanged, savedReadingVoice, selectedEnglishVoice } from './readingVoices'
+import { readingVoiceChanged, savedReadingVoice } from './readingVoices'
 
 export function spokenText(element: HTMLElement | null) {
   if (!element) return ''
@@ -20,48 +20,48 @@ function chunks(text: string) {
   if (text) result.push(text)
   return result
 }
-export function useReadAloud() {
-  const supported = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined'
+export function useReadAloud(sessionId: string) {
+  const supported = typeof window.AudioContext !== 'undefined'
   const [activeId, setActiveId] = useState<string | null>(null), [paused, setPaused] = useState(false), [error, setError] = useState('')
-  const generation = useRef(0), utterance = useRef<SpeechSynthesisUtterance | null>(null)
+  const generation = useRef(0), context = useRef<AudioContext | null>(null), pending = useRef<AbortController | null>(null)
   const stop = useCallback(() => {
-    generation.current++; utterance.current = null
-    if (supported) window.speechSynthesis.cancel()
+    generation.current++; pending.current?.abort(); pending.current = null
+    const audio = context.current; context.current = null; if (audio) void audio.close().catch(() => {})
     setActiveId(null); setPaused(false)
-  }, [supported])
+  }, [])
   useEffect(() => {
-    if (!supported) return
-    const synth = window.speechSynthesis, playbackGeneration = generation, currentUtterance = utterance
+    const run = generation, request = pending, playback = context
     window.addEventListener(readingVoiceChanged, stop)
-    return () => { playbackGeneration.current++; currentUtterance.current = null; synth.cancel(); window.removeEventListener(readingVoiceChanged, stop) }
-  }, [supported, stop])
+    return () => { run.current++; request.current?.abort(); if (playback.current) void playback.current.close().catch(() => {}); window.removeEventListener(readingVoiceChanged, stop) }
+  }, [stop])
   function read(id: string, text: string) {
-    if (!supported) { setError('Read aloud is unavailable in this browser.'); return }
+    if (!supported) { setError('Audio playback is unavailable in this browser.'); return }
     stop(); setError('')
     if (!text.trim()) { setError('This reply has no text to read aloud.'); return }
-    const synth = window.speechSynthesis, available = synth.getVoices()
-    const voice = selectedEnglishVoice(available, savedReadingVoice())
-    const queue = chunks(text), run = generation.current
+    const audio = new AudioContext(); context.current = audio
+    const unlocked = audio.resume(), run = generation.current, queue = chunks(text), voice = savedReadingVoice()
     setActiveId(id)
-    const next = () => {
+    const next = async () => {
       if (generation.current !== run) return
-      const part = queue.shift()
-      if (!part) { utterance.current = null; setActiveId(null); setPaused(false); return }
-      const speech = new SpeechSynthesisUtterance(part); utterance.current = speech
-      if (voice) { speech.voice = voice; speech.lang = voice.lang } else speech.lang = 'en-US'
-      speech.onend = next
-      speech.onerror = event => {
+      const part = queue.shift(); if (!part) { stop(); return }
+      const controller = new AbortController(); pending.current = controller
+      try {
+        await unlocked
+        const response = await fetch(`/mobile/api/sessions/${sessionId}/read-aloud`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice, text: part }), signal: controller.signal })
+        if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'Speech generation failed.') }
+        const data = await response.arrayBuffer()
         if (generation.current !== run) return
-        stop(); setError(event.error === 'not-allowed' ? 'Your browser blocked playback. Tap Read aloud again.' : 'Speech playback failed. Check your device voice settings and try again.')
-      }
-      try { synth.speak(speech) } catch { stop(); setError('Speech playback could not start. Check your device voice settings.') }
+        const buffer = await audio.decodeAudioData(data)
+        if (generation.current !== run) return
+        const source = audio.createBufferSource(); source.buffer = buffer; source.connect(audio.destination)
+        source.onended = () => { if (generation.current === run) void next() }; source.start()
+      } catch (cause) { if (generation.current !== run) return; stop(); setError(cause instanceof Error ? cause.message : 'Read aloud could not start.') }
     }
-    next()
+    void next()
   }
   function togglePause() {
-    if (!supported || !activeId) return
-    if (paused) window.speechSynthesis.resume(); else window.speechSynthesis.pause()
-    setPaused(!paused)
+    const audio = context.current; if (!audio) return
+    void (paused ? audio.resume() : audio.suspend()).catch(() => { stop(); setError('Audio playback could not continue.') }); setPaused(!paused)
   }
   return { supported, activeId, paused, error, read, stop, togglePause }
 }

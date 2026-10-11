@@ -10,6 +10,7 @@ import { MAX_IMAGE_BYTES, attachmentText } from './attachments.mjs';
 import { inventory } from './agents.mjs';
 import { TailscaleTransport } from './mobile-tailscale.mjs';
 import { ConversationMedia } from './conversation-media.mjs';
+import { LocalReadAloud } from './local-read-aloud.mjs';
 import { MobileTranscripts } from './mobile-transcript.mjs';
 import { MobileReports } from './mobile-reports.mjs';
 import { MobileDictation } from './mobile-dictation.mjs';
@@ -23,13 +24,13 @@ const DEVICE_TTL = 180 * 24 * 60 * 60 * 1000;
 const send = (ws, value) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(value)); };
 
 export class MobileGateway {
-  constructor({ repo, uiDir, stateDir, sessions, attachments, settings, changed, closeChat, transport = new TailscaleTransport(), dictation = new MobileDictation(repo), chooseDictation }) {
+  constructor({ repo, uiDir, stateDir, sessions, attachments, settings, changed, closeChat, transport = new TailscaleTransport(), dictation = new MobileDictation(repo), chooseDictation, readAloud = new LocalReadAloud(repo) }) {
     Object.assign(this, { repo, uiDir, sessions, attachments, settings, changed, closeChat, transport });
     this.file = path.join(stateDir, 'mobile-access.json');
     this.saves = Promise.resolve(); this.pending = new Map(); this.clients = new Set(); this.inflight = new Map(); this.uploads = new Map(); this.queues = new Map();
     this.transcripts = new MobileTranscripts(); this.conversationMedia = new ConversationMedia(); this.active = false; this.error = ''; this.origin = ''; this.rate = { at: Date.now(), count: 0 };
     this.reports = new MobileReports(this);
-    this.dictation = dictation; this.chooseDictation = chooseDictation;
+    this.readAloud = readAloud; this.dictation = dictation; this.chooseDictation = chooseDictation;
   }
   async init() {
     this.state = { enabled: false, devices: [], receipts: [], ...await readJson(this.file, {}) };
@@ -132,7 +133,7 @@ export class MobileGateway {
     this.notify(); return this.status();
   }
   async revoke(id) {
-    this.dictation.revoke(id); this.conversationMedia.revoke(id);
+    this.readAloud.revoke(id); this.dictation.revoke(id); this.conversationMedia.revoke(id);
     this.pending.delete(id); this.state.devices = this.state.devices.filter(item => item.id !== id);
     for (const ws of this.clients) if (ws.deviceId === id) ws.close(1008, 'Device disconnected');
     await this.save(); this.notify(); return this.status();
@@ -257,6 +258,7 @@ export class MobileGateway {
           return json(response, 200, { status: 'connected' });
         }
         const device = this.device(request);
+        if (method === 'GET' && route === '/mobile/api/read-aloud') return json(response, 200, await this.readAloud.status());
         const media = /^\/mobile\/api\/sessions\/([a-f0-9-]{36})\/media\/([a-zA-Z0-9_-]{43})$/.exec(route);
         if (media && ['GET', 'HEAD'].includes(method)) { this.session(media[1]); return await this.conversationMedia.serve(request, response, media[1], media[2], device.id, url.searchParams.get('download') === '1'); }
         if (method === 'GET' && route === '/mobile/api/dictation') return json(response, 200, await this.dictation.status());
@@ -278,10 +280,20 @@ export class MobileGateway {
           if (!inventory().some(item => item.id !== 'shell' && item.id === data.agent && item.available)) fail('Choose an installed agent.');
           return json(response, 201, await this.sessions.create({ agent: data.agent, name: data.name, cwd: this.repo, bypass: this.settings().defaultBypass === true }));
         }
-        const match = /^\/mobile\/api\/sessions\/([a-f0-9-]{36})\/(messages|send|resume|close|key)$/.exec(route);
+        const match = /^\/mobile\/api\/sessions\/([a-f0-9-]{36})\/(messages|send|resume|close|key|read-aloud)$/.exec(route);
         if (match) {
           const session = this.session(match[1]);
           if (method === 'GET' && match[2] === 'messages') return json(response, 200, await this.conversationMedia.present(await this.transcripts.read(session), session, device.id));
+          if (method === 'POST' && match[2] === 'read-aloud') {
+            const controller = new AbortController(); let complete = false;
+            const abort = () => { if (!complete) controller.abort(); };
+            response.once('close', abort);
+            try {
+              const audio = await this.readAloud.synthesize(device.id, data, controller.signal);
+              if (!this.active || !this.state.devices.some(item => item.id === device.id && item.expires > Date.now())) fail('Phone disconnected', 401);
+              complete = true; response.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': audio.length, 'Cache-Control': 'no-store' }); response.end(audio); return;
+            } finally { response.off('close', abort); }
+          }
           if (method === 'POST' && match[2] === 'send') return json(response, 200, await this.submit(device, session.id, data));
           if (method === 'POST' && match[2] === 'resume') return json(response, 200, session.process ? this.list().find(item => item.id === session.id) : await this.sessions.resume(session.id));
           if (method === 'POST' && match[2] === 'close') return json(response, 200, await this.closeChat(session.id));
@@ -314,7 +326,7 @@ export class MobileGateway {
   }
   async close() {
     if (this.closed) return; this.closed = true;
-    this.dictation.close();
+    this.readAloud.close(); this.dictation.close();
     this.active = false; clearInterval(this.timer);
     for (const [event, handler] of Object.entries(this.handlers)) this.sessions.off(event, handler);
     for (const ws of this.clients) ws.terminate(); this.wss.close();

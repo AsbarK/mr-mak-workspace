@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { englishVoices, selectedEnglishVoice } from '../../../src/mobile/readingVoices.ts';
-const voice = (voiceURI, lang, localService = true, isDefault = false) => ({ voiceURI, name: voiceURI, lang, localService, default: isDefault });
-test('settings offer only two English voices, prefer local speech, and discard non-English saved choices', () => {
-  const voices = [voice('Turkish', 'tr-TR', true, true), voice('US online', 'en-US', false), voice('Australian', 'en-AU'), voice('British', 'en-GB'), voice('US', 'en-US'), voice('US', 'en-US')];
-  assert.deepEqual(englishVoices(voices).map(item => item.voiceURI), ['US', 'British']);
-  assert.equal(selectedEnglishVoice(voices, 'British').voiceURI, 'British');
-  assert.equal(selectedEnglishVoice(voices, 'Turkish').voiceURI, 'US');
-  assert.equal(selectedEnglishVoice(voices, 'Australian').voiceURI, 'US');
-  assert.deepEqual(englishVoices([voice('Turkish', 'tr-TR')]), []);
-  assert.equal(selectedEnglishVoice([], ''), undefined);
+import { readingVoices } from '../../../src/mobile/readingVoices.ts';
+import { LocalReadAloud } from '../local-read-aloud.mjs';
+test('exact fixed voices and strict synthesis inputs', async () => {
+  assert.deepEqual(readingVoices, [{ id: 'am_michael', label: 'Michael · US man' }, { id: 'bf_emma', label: 'Emma · UK woman' }]);
+  const speech = new LocalReadAloud('missing-model-fixture');
+  await assert.rejects(speech.synthesize('phone', { voice: 'local-au', text: 'hello' }), error => error.status === 400);
+  await assert.rejects(speech.synthesize('phone', { voice: 'am_michael', text: 'x'.repeat(2001) }), error => error.status === 400);
+  await assert.rejects(speech.synthesize('phone', { voice: 'am_michael', text: 'hello' }), error => error.status === 503);
+  speech.close();
 });

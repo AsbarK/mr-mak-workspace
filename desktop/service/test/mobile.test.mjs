@@ -285,3 +285,18 @@ test('conversation images require pairing and grants belong to the requesting ph
   await gateway.revoke(device.pending.id);
   assert.equal((await fetch(url, { headers: { Cookie: device.cookie } })).status, 401);
 });
+
+
+test('fixed voice generation requires a paired same-origin session and revokes with the phone', async t => {
+  const { gateway, request, pair, id } = await fixture(t), calls = [];
+  gateway.readAloud = { status: async () => ({ available: true }), synthesize: async (device, data) => { calls.push({ device, ...data }); return Buffer.from('RIFFtestWAVE'); }, revoke() {}, close() {} };
+  const device = await pair(), route = `/sessions/${id}/read-aloud`;
+  assert.equal((await request(route, { voice: 'am_michael', text: 'hello' })).status, 401);
+  assert.equal((await request(route, { voice: 'am_michael', text: 'hello' }, device.cookie, { Origin: 'https://untrusted.example' })).status, 403);
+  const response = await fetch(gateway.origin + '/mobile/api' + route, { method: 'POST', headers: { Cookie: device.cookie, Origin: gateway.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: 'bf_emma', text: 'A test reply.' }) });
+  assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'audio/wav');
+  assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal((await response.text()), 'RIFFtestWAVE');
+  assert.equal(calls.length, 1); assert.equal(calls[0].voice, 'bf_emma');
+  await gateway.revoke(device.pending.id);
+  assert.equal((await request(route, { voice: 'am_michael', text: 'hello' }, device.cookie)).status, 401);
+});

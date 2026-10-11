@@ -61,7 +61,7 @@ function Connect() {
 }
 
 function Conversation({ session }: { session: ChatSession }) {
-  const speech = useReadAloud(), stopReading = speech.stop
+  const speech = useReadAloud(session.id), stopReading = speech.stop
   const [mode, setMode] = useState<'messages' | 'terminal'>(['codex', 'claude'].includes(session.agent) ? 'messages' : 'terminal')
   useEffect(() => { if (mode === 'terminal') stopReading() }, [mode, stopReading])
   const [messages, setMessages] = useState<Message[]>([]), [supported, setSupported] = useState(true), [error, setError] = useState('')

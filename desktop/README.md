@@ -111,3 +111,11 @@ and 2.0.21 on Windows. No paid model calls are made.
 
 Windows x64 and Linux are supported native targets. macOS remains a future target;
 the shared platform boundary avoids making Linux behavior a prerequisite for it.
+
+Read aloud uses fixed, free local voices: Michael (US man) and Emma (UK woman).
+Run `powershell -ExecutionPolicy Bypass -File scripts/setup-local-read-aloud.ps1`
+on Windows once. Models and the CPU Python environment stay under the ignored
+`.cache/read-aloud` folder; no cloud speech key or paid account is needed.
+Phone settings stores the voice choice. The mobile service lazily starts its
+own voice worker and releases it after idle time; updating service files requires
+a user-approved application restart.

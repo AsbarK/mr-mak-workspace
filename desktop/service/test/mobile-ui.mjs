@@ -33,6 +33,7 @@ const dictation = new MobileDictation(repo, { env: { OPENROUTER_API_KEY: 'test-v
 } });
 const service = await createService({ repo, uiDir: path.join(repo, 'ui'), mobileOptions: { transport, dictation }, mcpOptions: { home: repo, env: {} } });
 service.sessions.beginDiscovery = () => {};
+service.mobile.readAloud = { status: async () => ({ available: true }), synthesize: async () => Buffer.from('RIFFfakeWAVE'), revoke() {}, close() {} };
 const writes = [], ids = [randomUUID(), randomUUID()];
 for (const [index, id] of ids.entries()) {
   const session = service.sessions.make({ id, name: index ? 'Research ideas' : 'Game animations', agent: index ? 'claude' : 'codex', status: 'running', open: true, pinned: !index, cols: 100, rows: 28, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), cwd: repo });
@@ -76,16 +77,17 @@ try {
     };
   });
   await mobileContext.addInitScript(() => {
-    const service = new EventTarget();
-    window.testSpeech = { spoken: [], cancelled: 0, paused: false, current: null };
-    Object.assign(service, {
-      getVoices: () => [{ voiceURI: 'local-en', name: 'Test English', lang: 'en-US', localService: true, default: true }, { voiceURI: 'local-gb', name: 'Test British', lang: 'en-GB', localService: true, default: false }, { voiceURI: 'local-au', name: 'Test Australian', lang: 'en-AU', localService: true, default: false }, { voiceURI: 'local-tr', name: 'Test Turkish', lang: 'tr-TR', localService: true, default: false }],
-      speak: utterance => { window.testSpeech.spoken.push({ text: utterance.text, voice: utterance.voice?.voiceURI }); window.testSpeech.current = utterance; },
-      cancel: () => { window.testSpeech.cancelled++; window.testSpeech.current = null; },
-      pause: () => { window.testSpeech.paused = true; }, resume: () => { window.testSpeech.paused = false; },
-    });
-    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: service });
-    Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: class { constructor(text) { this.text = text; } } });
+    window.testSpeech = { spoken: [], cancelled: 0, paused: false, current: null, closed: true };
+    const originalFetch = window.fetch;
+    window.fetch = (url, options) => { if (String(url).endsWith('/read-aloud') && options?.body) { const data = JSON.parse(options.body); window.testSpeech.spoken.push({ text: data.text, voice: data.voice }); } return originalFetch(url, options); };
+    Object.defineProperty(window, 'AudioContext', { configurable: true, value: class {
+      constructor() { window.testSpeech.closed = false; this.destination = {}; }
+      resume() { window.testSpeech.paused = false; return Promise.resolve(); }
+      suspend() { window.testSpeech.paused = true; return Promise.resolve(); }
+      close() { window.testSpeech.closed = true; window.testSpeech.current = null; window.testSpeech.cancelled++; return Promise.resolve(); }
+      decodeAudioData() { return Promise.resolve({}); }
+      createBufferSource() { return { connect() {}, start() { window.testSpeech.current = { onend: () => this.onended?.() }; } }; }
+    } });
   });
   const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000); phone.on('pageerror', error => errors.push(error.message));
   // Open from another site like a QR scanner, rather than an address-bar visit.
@@ -231,9 +233,10 @@ try {
   await expect(readButton.locator('svg')).toHaveCount(1);
   await expect(phone.locator('.mobile-message').last().getByRole('button', { name: 'Read aloud', exact: true })).toBeVisible();
   await readButton.click();
+  await phone.waitForFunction(() => window.testSpeech.spoken.length > 0);
   assert.ok((await phone.evaluate(() => window.testSpeech.spoken[0].text)).startsWith('Can we make'));
-  const spokenRange = await phone.evaluate(() => {
-    for (let index = 0; index < 100 && window.testSpeech.current; index++) { const current = window.testSpeech.current; window.testSpeech.current = null; current.onend?.(); }
+  const spokenRange = await phone.evaluate(async () => {
+    for (let index = 0; index < 500 && !window.testSpeech.closed; index++) { if (window.testSpeech.current) { const current = window.testSpeech.current; window.testSpeech.current = null; current.onend?.(); } await new Promise(resolve => setTimeout(resolve, 10)); }
     return window.testSpeech.spoken.map(part => part.text).join(' ');
   });
   assert.ok(spokenRange.includes('Intermediate agent progress is included.'));
@@ -249,12 +252,12 @@ try {
   await phone.getByRole('button', { name: 'Phone settings' }).click();
   const readingVoice = phone.getByRole('combobox', { name: 'English reading voice' });
   await expect(readingVoice.locator('option')).toHaveCount(2);
-  assert.deepEqual(await readingVoice.locator('option').evaluateAll(options => options.map(option => option.value)), ['local-en', 'local-gb']);
-  await readingVoice.selectOption('local-gb');
-  assert.equal(await phone.evaluate(() => localStorage.getItem('mrmak.mobile.read-aloud.voice')), 'local-gb');
+  assert.deepEqual(await readingVoice.locator('option').evaluateAll(options => options.map(option => option.value)), ['am_michael', 'bf_emma']);
+  await readingVoice.selectOption('bf_emma');
+  assert.equal(await phone.evaluate(() => localStorage.getItem('mrmak.mobile.read-aloud.voice')), 'bf_emma');
   await phone.getByRole('button', { name: 'Phone settings' }).click();
   await readButton.click();
-  assert.equal(await phone.evaluate(() => window.testSpeech.spoken.at(-1).voice), 'local-gb');
+  await phone.waitForFunction(() => window.testSpeech.spoken.at(-1)?.voice === 'bf_emma');
   await phone.getByRole('button', { name: 'Stop reading' }).click();
   assert.equal(await phone.evaluate(() => window.testSpeech.current), null);
   await readButton.click();
