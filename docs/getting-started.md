@@ -107,6 +107,37 @@ CLI account billing and OpenAI voice API billing are separate. No API generation
 is needed to browse the samples or use a signed-in CLI. Optional dictation into
 terminals is described in [voice dictation](../knowledge/voice-dictation.md).
 
+## macOS
+
+There is no prebuilt Mac download; build the app once from source (about five
+minutes). Install Node.js 22.20+, [Rust](https://rustup.rs) and the Xcode
+Command Line Tools (`xcode-select --install`), then run:
+
+```bash
+./setup.sh check      # report prerequisites
+./setup.sh desktop    # build Mr. Mak Workspace.app and a .dmg
+```
+
+Drag `src-tauri/target/release/bundle/macos/Mr. Mak Workspace.app` to
+Applications and double-click **Start Mr. Mak.command** in the cloned folder.
+The build bundles a self-contained Node runtime, so a Homebrew Node is fine.
+The app is not signed: the first time, right-click it and choose Open.
+
+Differences from Windows:
+
+- Shortcuts use ⌘ instead of Ctrl (⌘⇧T new chat, ⌘⇧P find, ⌘⇧H history,
+  ⌘1–9 switch chats, also in the Chats menu; Ctrl+Tab still cycles). In terminals ⌘C/⌘V copy and paste,
+  and Ctrl+C reaches the CLI as in Terminal.app.
+- Settings > Shortcut: **⌃⌥Space** brings back the windows from any app (the
+  Win-key equivalent). Clicking the Dock icon also restores closed windows.
+- Both windows share one Dock icon; the menu-bar icon offers Show Workspace,
+  Show Chats and Quit.
+- The first voice recording asks for microphone access.
+- `./scripts/check-macos-native.sh` checks the native parts (menus, shortcuts,
+  Dock reopen, ⌃⌥Space) through Accessibility; it needs the screen for ~30 s.
+
+Details of the port, verification and known limits: [macOS notes](macos.md).
+
 ## Build from source
 
 From a fresh clone, `npm ci` installs both the frontend and local desktop

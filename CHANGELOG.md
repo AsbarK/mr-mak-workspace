@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased - macOS
+
+- Build and run the desktop app on macOS: `./setup.sh desktop` produces `Mr. Mak Workspace.app` and a `.dmg`; **Start Mr. Mak.command** opens it on the repository.
+- Bundle a self-contained Node on macOS when the local Node is a Homebrew build linked to `libnode.dylib`, and keep the bundled copy writable so rebuilds succeed.
+- Fix terminals on macOS: node-pty's `spawn-helper` is made executable after install and in the desktop runtime.
+- Use ⌘ for app shortcuts, copy and paste on macOS; Ctrl+C reaches the CLI. Chat numbers use ⌘1–9 (physical keys, so Option/Alt layouts work).
+- Add ⌃⌥Space as the macOS recall shortcut (Settings and menu-bar menu), and restore closed windows from the Dock icon.
+- Drag files from Workspace to other apps on macOS; Show in Finder selects the file.
+- Give the service the login-shell PATH when the app starts from Finder or the Dock, so installed CLIs are found.
+- Find the Tailscale CLI inside Tailscale.app, read Claude Code's managed MCP file from its macOS/Linux location, and ask for microphone access with a usage description.
+- Say Finder/Trash on macOS instead of Explorer/Recycle Bin.
+- Add a Chats menu on macOS with Chat 1–9 on ⌘1–⌘9; the native window never passes ⌘+number to the page.
+- Quote dropped shell paths the zsh/bash way ('\'') on macOS and Linux, so names with an apostrophe work.
+- Add `scripts/check-macos-native.sh`: menus, ⌘1–9, ⌘⇧W, Dock reopen and ⌃⌥Space checked through Accessibility.
+
 ## 0.5.1 - 2026-10-09
 
 - Click a card's status dot in the desktop Workspace to set Active, Done or Archived, change its category, or pin it. Changes save immediately; archived cards keep their files and can be restored through search or Show archive.
