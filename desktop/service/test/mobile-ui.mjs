@@ -108,7 +108,7 @@ try {
     // Patch the prototype (WebKit ignores an own-property override). Chromium uses its
     // fake capture device; headless WebKit has none, so fall back to a synthetic tone.
     const original = MediaDevices.prototype.getUserMedia;
-    const CaptureAudioContext = window.AudioContext;
+    const CaptureAudioContext = window.testCaptureAudioContext || window.AudioContext;
     window.testMicTracks = [];
     MediaDevices.prototype.getUserMedia = async function (options) {
       if (window.testDenyMic) { window.testDenyMic = false; throw new DOMException('Permission denied', 'NotAllowedError'); }
@@ -121,6 +121,7 @@ try {
     };
   });
   await mobileContext.addInitScript(() => {
+    window.testCaptureAudioContext = window.AudioContext;
     window.testSpeech = { spoken: [], cancelled: 0, paused: false, current: null, closed: true };
     const originalFetch = window.fetch;
     window.fetch = (url, options) => { if (String(url).endsWith('/read-aloud') && options?.body) { const data = JSON.parse(options.body); window.testSpeech.spoken.push({ text: data.text, voice: data.voice }); } return originalFetch(url, options); };
@@ -266,17 +267,30 @@ try {
   await imagePreview.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await expect(imagePreview.getByRole('button', { name: 'Reset image zoom' })).toHaveText('150%');
   await imagePreview.getByRole('button', { name: 'Reset image zoom' }).click();
-  const touch = await mobileContext.newCDPSession(phone);
   const stage = await imagePreview.locator('.mobile-image-stage').boundingBox();
   const cx = stage.x + stage.width / 2, cy = stage.y + stage.height / 2;
   const points = offset => [{ x: cx - offset, y: cy, id: 1 }, { x: cx + offset, y: cy, id: 2 }];
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(40) });
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(80) });
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  if (testBrowser === 'webkit') {
+    // Playwright exposes native multi-touch through Chromium CDP only. Exercise
+    // the pointer handlers in WebKit; native iOS pinch still needs device review.
+    await imagePreview.locator('.mobile-image-stage').evaluate((node, { cx, cy }) => {
+      const capture = node.setPointerCapture; node.setPointerCapture = () => {};
+      const pointer = (type, id, x) => node.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: id, clientX: x, clientY: cy }));
+      pointer('pointerdown', 1, cx - 40); pointer('pointerdown', 2, cx + 40);
+      pointer('pointermove', 1, cx - 80); pointer('pointermove', 2, cx + 80);
+      pointer('pointerup', 1, cx - 80); pointer('pointerup', 2, cx + 80);
+      node.setPointerCapture = capture;
+    }, { cx, cy });
+  } else {
+    const touch = await mobileContext.newCDPSession(phone);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(40) });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(80) });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await touch.detach();
+  }
   await expect(imagePreview.getByRole('button', { name: 'Reset image zoom' })).toHaveText('200%');
   assert.equal(await phone.evaluate(() => window.visualViewport.scale), 1, 'Pinch affects only the image');
   await phone.screenshot({ path: path.join(repo, 'phone-image-viewer.png') });
-  await touch.detach();
   const imageDownload = phone.waitForEvent('download');
   await imagePreview.getByRole('link', { name: 'Download image' }).click();
   assert.equal((await imageDownload).suggestedFilename(), 'shared-picture.png');

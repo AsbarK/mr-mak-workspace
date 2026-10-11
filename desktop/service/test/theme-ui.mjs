@@ -67,6 +67,7 @@ try {
   await page.getByRole('button', { name: 'Toggle settings', exact: true }).click();
   await page.getByLabel('Workspace theme', { exact: true }).selectOption('system');
   await expect(page.locator('html')).toHaveAttribute('data-workspace-theme', 'dark');
+  await page.bringToFront();
   await page.emulateMedia({ colorScheme: 'light' });
   await expect(page.locator('html')).toHaveAttribute('data-workspace-theme', 'light');
   await page.getByLabel('Workspace theme', { exact: true }).selectOption('light');
