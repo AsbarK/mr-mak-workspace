@@ -44,3 +44,36 @@ test('exact image grants isolate devices/sessions, expire, validate bytes and re
     await media.present({ messages: [{ imageRefs: [inline] }] }, session, 'phone'); media.revoke('phone'); assert.equal(media.grants.size, 0);
   } finally { await rm(folder, { recursive: true, force: true }); }
 });
+
+
+test('video links and structured records retain video-only replies', () => {
+  assert.deepEqual(imageReferences([{ type: 'video', video_url: { url: 'capture.webm' } }], '[Recording](<C:/My captures/run.mp4>)'), ['capture.webm', 'C:/My captures/run.mp4']);
+  const messages = transcriptMessages([{ type: 'assistant', message: { content: [{ type: 'video', url: 'capture.mp4' }] } }], 'claude');
+  assert.equal(messages.length, 1); assert.equal(messages[0].text, ''); assert.deepEqual(messages[0].imageRefs, ['capture.mp4']);
+});
+
+test('recorded video streams ranges, validates files and isolates grants', async t => {
+  const { createServer } = await import('node:http');
+  const folder = await mkdtemp(path.join(os.tmpdir(), 'mak-video-'));
+  t.after(() => rm(folder, { recursive: true, force: true }));
+  const video = Buffer.concat([Buffer.from([0,0,0,24]), Buffer.from('ftypisom'), Buffer.alloc(8192, 42)]);
+  const file = path.join(folder, 'recording.mp4'); await writeFile(file, video);
+  const media = new ConversationMedia();
+  const shown = await media.present({ messages: [{ imageRefs: [file] }] }, { id: 'chat', cwd: folder }, 'phone');
+  assert.equal(shown.messages[0].images[0].kind, 'video');
+  const token = shown.messages[0].images[0].url.split('/').pop();
+  const server = createServer((request, response) => { void media.serve(request, response, 'chat', token, request.headers['x-device'] || 'phone', request.url === '/download'); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  let result = await fetch(url, { headers: { Range: 'bytes=100-199' } });
+  assert.equal(result.status, 206); assert.equal(result.headers.get('content-range'), `bytes 100-199/${video.length}`); assert.deepEqual(Buffer.from(await result.arrayBuffer()), video.subarray(100,200));
+  result = await fetch(url, { headers: { Range: 'bytes=-50' } }); assert.equal((await result.arrayBuffer()).byteLength, 50);
+  result = await fetch(url, { headers: { Range: 'bytes=99999-' } }); assert.equal(result.status, 416);
+  assert.equal((await fetch(url, { headers: { Range: 'bytes=0-1,3-4' } })).status, 416);
+  result = await fetch(url, { method: 'HEAD' }); assert.equal(result.status, 200); assert.equal(result.headers.get('content-length'), String(video.length));
+  result = await fetch(url + '/download'); assert.match(result.headers.get('content-disposition'), /^attachment;/); await result.arrayBuffer();
+  assert.equal((await fetch(url, { headers: { 'x-device': 'another-phone' } })).status, 404);
+  await writeFile(file, 'not a video'); assert.equal((await fetch(url)).status, 404);
+  await writeFile(file, video); media.revoke('phone'); assert.equal((await fetch(url)).status, 404);
+});

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../desktop/Icons'
 
-export interface ConversationImage { url?: string; name: string; unavailable?: boolean }
+export interface ConversationImage { url?: string; name: string; unavailable?: boolean; kind?: 'image' | 'video'; type?: string }
 interface Position { scale: number; x: number; y: number }
 const initial: Position = { scale: 1, x: 0, y: 0 }
 

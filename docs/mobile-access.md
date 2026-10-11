@@ -211,3 +211,11 @@ reloading the app. The current view, selected chat, draft and scroll position st
 in place. Online and restored-page events use the same recovery; old bootstrap
 replies are ignored, connection attempts have a deadline, and failed attempts
 retry while the app is visible. The nose button reconnects in place as well.
+
+Recorded local videos linked explicitly in Conversation (MP4, WebM, MOV or M4V)
+appear as video cards. Tap to open a separate player with playback controls,
+seeking and download. Video files stream with byte-range support and a 512 MB
+limit, using the same paired-device/chat grants as images. Playback depends on
+the phone supporting the recorded codec. External video URLs and arbitrary
+paths printed in terminal tool logs are not fetched. Agents should share
+recordings as a Markdown link to the saved file.

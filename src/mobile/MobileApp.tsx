@@ -18,7 +18,7 @@ import './mobile.css'
 
 interface Pending { id: string; claim: string; code: string }
 interface ToolActivity { id: string; name: string; status: 'running' | 'completed' | 'failed'; at: string }
-interface Message { id: string; role: 'user' | 'assistant'; text: string; at: string; images?: { url?: string; name: string; unavailable?: boolean }[] }
+interface Message { id: string; role: 'user' | 'assistant'; text: string; at: string; images?: { url?: string; name: string; unavailable?: boolean; kind?: 'image' | 'video'; type?: string }[] }
 function getPairToken() {
   const token = new URLSearchParams(location.hash.slice(1)).get('pair')
   if (token) { sessionStorage.setItem('mrmak.mobile.pair', token); history.replaceState(null, '', location.pathname) }

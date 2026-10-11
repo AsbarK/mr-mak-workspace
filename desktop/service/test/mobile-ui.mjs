@@ -48,11 +48,23 @@ service.mobile.transcripts.read = async session => ({ supported: true, activity:
   { id: 'old-agent', role: 'assistant', text: 'Older answer excluded from speech.', at: '' },
   { id: 'user', role: 'user', text: 'Can we make the next iteration easier to review?', at: new Date().toISOString() },
   { id: 'progress', role: 'assistant', text: 'Intermediate agent progress is included.', at: '' },
-  { id: 'assistant', role: 'assistant', imageRefs: [path.join(repo, 'shared-picture.png')], text: '## Ready for review\n\nThe latest results are in your Workspace.\n\n- **Character:** proportions updated\n- **Motion:** timing checked\n- **Next step:** choose the version you prefer\n\n[Open the source](https://example.com/source)\n\n' + (session.id === ids[0] ? 'Your agent is still working on the computer.' : 'Send a follow-up whenever an idea comes to mind.'), at: new Date().toISOString() },
+  { id: 'assistant', role: 'assistant', imageRefs: [path.join(repo, 'shared-picture.png'), path.join(repo, 'recording.webm')], text: '## Ready for review\n\nThe latest results are in your Workspace.\n\n- **Character:** proportions updated\n- **Motion:** timing checked\n- **Next step:** choose the version you prefer\n\n[Open the source](https://example.com/source)\n\n' + (session.id === ids[0] ? 'Your agent is still working on the computer.' : 'Send a follow-up whenever an idea comes to mind.'), at: new Date().toISOString() },
 ] });
 let browser, qrSource;
 try {
   browser = await chromium.launch({ headless: true, channel: process.env.MRMAK_TEST_BROWSER || 'msedge', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  const recordingPage = await browser.newPage();
+  const recordedBytes = await recordingPage.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = 90;
+    const ctx = canvas.getContext('2d'), stream = canvas.captureStream(15);
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' }), parts = [];
+    const finished = new Promise(resolve => { recorder.ondataavailable = event => parts.push(event.data); recorder.onstop = async () => resolve(Array.from(new Uint8Array(await new Blob(parts).arrayBuffer()))); });
+    recorder.start();
+    const draw = setInterval(() => { ctx.fillStyle = Date.now() % 2 ? 'blue' : 'green'; ctx.fillRect(0,0,160,90); }, 30);
+    await new Promise(resolve => setTimeout(resolve, 800)); recorder.stop(); clearInterval(draw);
+    const bytes = await finished; stream.getTracks().forEach(track => track.stop()); return bytes;
+  });
+  await writeFile(path.join(repo, 'recording.webm'), Buffer.from(recordedBytes)); await recordingPage.close();
   const desktop = await browser.newPage({ viewport: { width: 640, height: 860 } }); desktop.setDefaultTimeout(12000);
   const errors = []; desktop.on('pageerror', error => errors.push(error.message));
   await desktop.goto(service.urls.chats); await desktop.getByRole('button', { name: 'Mobile access', exact: true }).click();
@@ -237,6 +249,19 @@ try {
   await imagePreview.getByRole('link', { name: 'Download image' }).click();
   assert.equal((await imageDownload).suggestedFilename(), 'shared-picture.png');
   await imagePreview.getByRole('button', { name: 'Close image', exact: true }).click();
+  await phone.getByRole('button', { name: 'Open video recording.webm' }).first().click();
+  const videoPreview = phone.getByRole('dialog', { name: 'Shared video preview' });
+  await videoPreview.waitFor();
+  const player = videoPreview.locator('video');
+  await expect.poll(() => player.evaluate(video => video.readyState)).toBeGreaterThanOrEqual(2);
+  assert.equal(await player.evaluate(video => video.controls && video.playsInline), true);
+  await player.evaluate(video => video.play());
+  await expect.poll(() => player.evaluate(video => video.currentTime)).toBeGreaterThan(0);
+  await player.evaluate(video => { video.pause(); video.currentTime = 0.2; });
+  await expect.poll(() => player.evaluate(video => video.currentTime)).toBeGreaterThanOrEqual(0.19);
+  await videoPreview.getByRole('button', { name: 'Close video' }).click();
+  assert.equal(await phone.locator('.mobile-video-stage').count(), 0);
+
   await expect(imagePreview).not.toBeVisible();
   const readButton = phone.locator('.mobile-message.assistant').getByRole('button', { name: 'Read aloud', exact: true }).first();
   assert.equal(await phone.evaluate(() => window.testSpeech.spoken.length), 0, 'No automatic playback');
