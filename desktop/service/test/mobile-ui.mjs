@@ -143,7 +143,24 @@ try {
     };
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.testVisibility || 'visible' });
   });
-  const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000); phone.on('pageerror', error => errors.push(error.message));
+  let reloadingPhone = false;
+  const navigationCancellations = [];
+  const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000);
+  await phone.exposeFunction('testUnhandledRejection', message => errors.push(`Unhandled rejection: ${message}`));
+  await phone.addInitScript(() => window.addEventListener('unhandledrejection', event => { void window.testUnhandledRejection(String(event.reason)).catch(() => {}); }));
+  phone.on('pageerror', error => {
+    // WebKit emits native access-control diagnostics for reads cancelled by a
+    // document reload even when fetch is caught. Permit only these two local
+    // read routes during our own reload; all JS errors/rejections still fail.
+    const route = error.message.match(/\/mobile\/api\/(bootstrap|sessions\/[a-f0-9-]+\/messages) due to access control checks\.$/)?.[1];
+    const local = error.message.includes(new URL(service.mobile.origin).host + '/mobile/api/');
+    if (testBrowser === 'webkit' && reloadingPhone && local && route) navigationCancellations.push(error.message);
+    else errors.push(error.message);
+  });
+  async function reloadPhone() {
+    reloadingPhone = true;
+    try { await phone.reload(); } finally { reloadingPhone = false; }
+  }
   // Open from another site like a QR scanner, rather than an address-bar visit.
   qrSource = http.createServer((_request, response) => {
     response.writeHead(200, { 'Content-Type': 'text/html' });
@@ -425,7 +442,7 @@ try {
   await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
   await expect(stableDraft).toHaveValue('A draft retained across mobile views.');
   await expect.poll(() => phone.locator('.mobile-messages').evaluate(box => box.scrollTop)).toBe(0);
-  await phone.reload();
+  await reloadPhone();
   await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
   await expect(stableDraft).toHaveValue('A draft retained across mobile views.');
   await expect.poll(() => phone.locator('.mobile-messages').evaluate(box => box.scrollTop)).toBe(0);
@@ -440,7 +457,7 @@ try {
   assert.equal(await phone.locator('.mobile-messages').evaluate(box => box.scrollTop), 0, 'Returning from Terminal preserves history position');
   await phone.getByRole('button', { name: 'Terminal', exact: true }).click();
   await phone.locator('.mobile-terminal').waitFor();
-  await phone.reload();
+  await reloadPhone();
   await phone.getByRole('heading', { name: selectedBeforeWorkspace, exact: true }).waitFor();
   await phone.locator('.mobile-terminal').waitFor();
   assert.equal(await phone.locator('.mobile-messages').count(), 0, 'Reload restores Terminal mode');
@@ -483,7 +500,7 @@ try {
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).waitFor();
   assert.equal(voiceCalls.length, 2);
   await restoreReplies(phone, '/mobile/api/transcribe');
-  await phone.reload();
+  await reloadPhone();
   await phone.getByRole('heading', { name: 'Research ideas', exact: true }).waitFor();
   await phone.getByRole('button', { name: 'Transcribe recording', exact: true }).click();
   await expect(input).toHaveValue('Existing draft\nA dictated follow-up.\nA dictated follow-up.');
@@ -593,7 +610,7 @@ try {
   const beforeForged = await phone.evaluate(key => localStorage.getItem(key), reportKey);
   await phone.evaluate(() => window.dispatchEvent(new MessageEvent('message', { source: window, origin: 'null', data: { type: 'mrmak:report-state', state: { path: 'malicious', top: 999, left: 0 } } })));
   assert.equal(await phone.evaluate(key => localStorage.getItem(key), reportKey), beforeForged, 'Messages from another window cannot change report position');
-  await phone.reload();
+  await reloadPhone();
   await frame.getByRole('heading', { name: 'Report ready' }).waitFor();
   await expect.poll(() => frame.locator('body').evaluate(() => window.scrollY)).toBe(500);
   assert.equal(await frame.locator('body').evaluate(() => location.hash), '#chapter-two');
@@ -617,7 +634,7 @@ try {
   await phone.getByRole('button', { name: 'Results', exact: true }).click();
   await phone.getByLabel('Select report page', { exact: true }).click();
   await phone.getByRole('button', { name: 'Plan', exact: true }).click(); await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
-  await phone.getByRole('button', { name: 'Chats', exact: true }).click(); await phone.reload();
+  await phone.getByRole('button', { name: 'Chats', exact: true }).click(); await reloadPhone();
   await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
   await restoreReplies(phone, contextRoute);
   await phone.getByRole('button', { name: 'Retry', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
@@ -653,7 +670,7 @@ try {
   await phone.getByRole('button', { name: 'Results', exact: true }).click();
   await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
   assert.equal(await phone.locator('.mobile-report-markdown').evaluate(node => node.scrollTop), 350);
-  await phone.reload();
+  await reloadPhone();
   await phone.getByRole('heading', { name: 'Mobile plan' }).waitFor();
   await expect.poll(() => phone.locator('.mobile-report-markdown').evaluate(node => node.scrollTop)).toBe(350);
 
@@ -689,7 +706,7 @@ try {
     if (!response.ok) throw new Error('Legacy fixture delivery failed');
     localStorage.setItem(`mrmak.mobile.draft.${id}`, JSON.stringify(data));
   }, { id: ids[1], data: legacyRequest });
-  await phone.reload(); await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  await reloadPhone(); await phone.getByRole('button', { name: 'Retry', exact: true }).waitFor();
   await phone.getByRole('button', { name: 'Retry', exact: true }).click(); await phone.getByText('Delivered to terminal', { exact: true }).waitFor();
   assert.equal(writes.length - legacyBefore, 2, 'Pre-update pending drafts remain compatible with delivery receipts');
   assert.equal(writes[legacyBefore].data, '\x1b[200~An older pending draft.\x1b[201~');
@@ -727,6 +744,7 @@ try {
   await desktop.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await phone.getByRole('heading', { name: 'Start in Mr. Mak Chats' }).waitFor();
   assert.equal(service.sessions.get(ids[0]).status, 'running'); assert.equal(service.sessions.get(ids[1]).status, 'running');
+  if (navigationCancellations.length) console.log(`Expected WebKit read cancellations during reload: ${navigationCancellations.length}`);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, fixture: repo, checks: ['Workspace context follows card/tab/page and section', 'navigation-only references; no report content or grant URLs', 'context frozen across lost reply, page change and reload', 'automatic context excluded from display and read aloud', 'cleared selection, slash commands and pre-update pending drafts', 'QR + desktop approval', 'independent views and PTY sizes', 'microphone permission / record / stop / cancel', 'dictation never auto-sends', 'saved recording recovery after reload and chat switch', 'lost transcription reply reuses provider result', 'lost reply / retry once', 'drafts per chat', 'offline recovery', 'image attachment', 'sandboxed report + image download', 'Markdown preview', 'long-link chat cards at 320/360/393/430/768px', '360/390/768px report layout', 'four terminal arrows and touch targets', 'close confirmation / desktop tab sync / History resume / draft retention', 'device revocation'] }));
 } finally {
