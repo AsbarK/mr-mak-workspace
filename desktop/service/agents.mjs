@@ -2,11 +2,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse as parseEnv } from 'dotenv';
 import { isWindows, resolveCommand, shellCommand, shellLabel } from './platform.mjs';
+import { validAntigravityId } from './antigravity.mjs';
 
 export { shellCommand };
 
 export function wrapCommand(file, args = []) {
-  if (!isWindows) return { file, args };
+  if (!isWindows || /\.exe$/i.test(file)) return { file, args };
   const quote = value => "'" + value.replaceAll("'", "''") + "'";
   const script = `[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & ${[file, ...args].map(quote).join(' ')}; exit $LASTEXITCODE`;
   return { file: shellCommand().file, args: ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] };
@@ -15,6 +16,7 @@ export function wrapCommand(file, args = []) {
 export const AGENTS = [
   { id: 'codex', label: 'Codex', color: '#88d8bf', command: 'codex', subscription: true },
   { id: 'claude', label: 'Claude Code', color: '#dba68c', command: 'claude', subscription: true },
+  { id: 'antigravity', label: 'Antigravity', color: '#8ab4f8', command: 'agy', subscription: true },
   { id: 'opencode', label: 'OpenCode', color: '#c8d2dc', command: 'opencode', subscription: false },
   { id: 'kimi', label: 'Kimi', color: '#b3a3f7', command: 'kimi', subscription: true },
   { id: 'shell', label: shellLabel(), color: '#89b7ed', command: 'shell', subscription: false },
@@ -53,8 +55,17 @@ export function codexBinary(env = process.env) {
   throw new Error('Codex CLI is not installed. Install it and sign in once to use Mr. Mak.');
 }
 
-export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort, opencodeMajor = 1 } = {}) {
+// Conversation IDs become CLI arguments. One shaped like an option would be
+// parsed as an option, for example a CLI's own permission-bypass flag.
+export function nativeConversationId(value) {
+  if (value == null || value === '') return undefined;
+  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)) throw new Error('This conversation ID is not valid. Copy it again from the CLI.');
+  return value;
+}
+
+export function terminalCommand(agent, { bypass = false, resumeId, nativeId, effort, opencodeMajor = 1, antigravityLog } = {}) {
   if (!AGENTS.some(item => item.id === agent)) throw new Error('Unknown agent');
+  resumeId = nativeConversationId(resumeId); nativeId = nativeConversationId(nativeId);
   const command = agent === 'shell' ? shellCommand() : { file: commandPath(AGENTS.find(item => item.id === agent).command), args: [] };
   if (!command || !command.file) throw new Error(`${agent} is not installed on this computer`);
   if (agent === 'shell' && (path.isAbsolute(command.file) ? !existsSync(command.file) : !commandPath(command.file))) throw new Error('The local shell is not available on this computer');
@@ -70,6 +81,12 @@ export function terminalCommand(agent, { bypass = false, resumeId, nativeId, eff
     else if (nativeId) args.push('--session-id', nativeId);
     if (bypass) args.push('--dangerously-skip-permissions');
     if (effort) args.push('--effort', effort);
+  } else if (agent === 'antigravity') {
+    if (resumeId && !validAntigravityId(resumeId)) throw new Error('Use the Antigravity conversation UUID from its /resume picker.');
+    if (resumeId) args.push('--conversation', resumeId);
+    if (bypass) args.push('--dangerously-skip-permissions');
+    if (effort) args.push('--effort', effort);
+    if (antigravityLog) args.push('--log-file', antigravityLog);
   } else if (agent === 'kimi') {
     if (resumeId) args.push('--session', resumeId);
     if (bypass) args.push('--yolo');
@@ -94,7 +111,7 @@ export function childEnvironment(repo) {
   }
   // Drop host-agent identity from the parent so every terminal is an independent CLI.
   for (const key of Object.keys(env)) {
-    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key) || key.startsWith('MRMAK_OPENCODE_')) delete env[key];
+    if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_THREAD_ID|CODEX_TURN_ID|CODEX_SHELL|ANTIGRAVITY_AGENT|MRMAK_TOKEN|MRMAK_PARENT_PID)$/.test(key) || key.startsWith('MRMAK_OPENCODE_')) delete env[key];
   }
   return env;
 }

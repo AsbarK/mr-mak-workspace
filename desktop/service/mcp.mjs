@@ -48,7 +48,7 @@ export class McpInventory {
       if (!Object.keys(object(configs)).length) return;
       sources.push({ client, scope, path: file });
       for (const [name, config] of Object.entries(object(configs))) {
-        if (config && typeof config === 'object') entries.push({ client, scope, file, name, config, priority, ...extras });
+        if (config && typeof config === 'object') entries.push({ client, scope, file, name, config: client === 'antigravity' && config.serverUrl ? { ...config, url: config.serverUrl } : config, priority, ...extras });
       }
     };
     const paths = {
@@ -58,6 +58,7 @@ export class McpInventory {
       claudeProjectSettings: path.join(this.repo, '.claude/settings.json'), claudeLocalSettings: path.join(this.repo, '.claude/settings.local.json'),
       kimiUser: path.join(this.home, '.kimi/mcp.json'), kimiProject: path.join(this.repo, '.kimi-code/mcp.json'),
       cursorUser: path.join(this.home, '.cursor/mcp.json'), cursorProject: path.join(this.repo, '.cursor/mcp.json'),
+      antigravityUser: path.join(this.home, '.gemini/config/mcp_config.json'), antigravityProject: path.join(this.repo, '.agents/mcp_config.json'),
     };
     const values = Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([name, file]) => [name, await read(file)])));
     const codex = merge(values.codexUser, values.codexProject);
@@ -68,7 +69,7 @@ export class McpInventory {
     const localProject = Object.entries(object(values.claudeUser.projects)).find(([folder]) => key(folder) === key(this.repo))?.[1] || {};
     add('claude', 'local', paths.claudeUser, localProject.mcpServers, 30);
     const claudeSettings = merge(merge(values.claudeSettings, values.claudeProjectSettings), values.claudeLocalSettings);
-    for (const client of ['kimi', 'cursor']) {
+    for (const client of ['kimi', 'cursor', 'antigravity']) {
       add(client, 'global', paths[`${client}User`], values[`${client}User`].mcpServers, 10);
       add(client, 'project', paths[`${client}Project`], values[`${client}Project`].mcpServers, 20);
     }

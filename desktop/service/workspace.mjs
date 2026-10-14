@@ -9,6 +9,24 @@ export const localDay = (date = new Date()) => `${date.getFullYear()}-${String(d
 const brief = ({ id, title, description, status, category, created, updated, pinned, steps }) => ({ id, title, description, status, category, created, updated, pinned: !!pinned, steps: (steps || []).map(({ name }, index) => ({ name, index })) });
 const invalid = message => Object.assign(new Error(message), { status: 400 });
 
+// Removes <script> and <style> blocks in one pass. A lazy regex up to the closing
+// tag rescans the rest of the text for every unclosed opening tag, which lets a
+// report stall the service. An unclosed block hides the rest, as it does in a browser.
+export function stripCodeBlocks(text) {
+  const opening = /<(script|style)\b/gi, closing = { script: /<\/script>/gi, style: /<\/style>/gi };
+  let result = '', kept = 0, match;
+  while ((match = opening.exec(text))) {
+    const tagEnd = text.indexOf('>', opening.lastIndex);
+    if (tagEnd < 0) break;
+    const close = closing[match[1].toLowerCase()];
+    close.lastIndex = tagEnd + 1;
+    result += text.slice(kept, match.index) + ' ';
+    if (!close.exec(text)) return result;
+    kept = opening.lastIndex = close.lastIndex;
+  }
+  return result + text.slice(kept);
+}
+
 // UI requests can only change card metadata, never report paths or contents.
 export function metadataPatch(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.keys(value).length || Object.keys(value).some(key => !['status', 'category', 'pinned'].includes(key))) {
@@ -38,7 +56,7 @@ export class Workspace {
     const { file } = await realFile(path.join(this.repo, 'workspace'), relative);
     if (!/\.(html?|md|txt)$/i.test(file) || (await stat(file)).size > 3 * 1024 * 1024) return { ...result, note: 'The card uses a visual or large report. Open it for the full content.' };
     const text = await readFile(file, 'utf8');
-    result.text = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 12000);
+    result.text = stripCodeBlocks(text).replace(/<[^<>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 12000);
     return result;
   }
   async activity(date) {

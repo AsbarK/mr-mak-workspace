@@ -4,7 +4,7 @@ Your CLI agents, a visual Workspace, and access from your phone.
 
 Mr. Mak has **two connected desktop windows**:
 
-- **Chats** is where you give tasks to Codex, Claude Code or OpenCode. Each
+- **Chats** is where you give tasks to Codex, Claude Code, Antigravity, OpenCode or Kimi. Each
   conversation runs in a real CLI terminal, with its own tab and saved history.
 - **Workspace** is where you review the results: project pages, research, images,
   saved prompts and reports. Files, skills, MCP connections and settings sit
@@ -78,13 +78,15 @@ the optional Live voice coordinator still uses OpenAI API billing.
 
 ## Before you start
 
-**Prerequisite: install and configure Codex CLI, Claude Code CLI or OpenCode
+**Prerequisite: install and configure Codex CLI, Claude Code CLI, Antigravity, OpenCode or Kimi
 before setting up Mr. Mak.** You need at least one. They can run side by side
 and are separate installations, not bundled with Mr. Mak.
 
 - [Install Codex CLI](https://developers.openai.com/codex/cli)
 - [Install Claude Code CLI](https://code.claude.com/docs/en/setup)
 - [Install OpenCode](https://opencode.ai/docs/)
+- [Install Antigravity CLI](https://www.antigravity.google/docs/cli/install/)
+- [Install Kimi Code CLI](https://moonshotai.github.io/kimi-cli/)
 
 **Do I need an API key?** No, not for Claude Code or Codex chats when you sign
 in with an eligible subscription. Mr. Mak runs the real CLI with its existing
@@ -96,6 +98,13 @@ and [Codex authentication](https://developers.openai.com/codex/auth).
 **OpenCode** uses the providers and authentication you configure in OpenCode.
 Their access and billing rules still apply; support here does not turn a Claude
 Code subscription into OpenCode API access. Choose **+ > OpenCode** in Chats.
+
+**Antigravity** runs Google's `agy` CLI in a chat tab. Install it from the
+[official guide](https://www.antigravity.google/docs/cli/install/), then choose
+**+ > Antigravity**, sign in and use `/model` to select an available model.
+Google controls model access and usage limits. History resumes the exact
+conversation recorded for that tab. Antigravity currently uses the terminal
+view on phones; structured replies and completion badges are not available yet.
 
 The optional voice coordinator specifically requires **Codex CLI** and your own
 **OpenAI API key**. Voice API usage is billed separately. Leave voice off to use
@@ -128,10 +137,11 @@ with `--repo /path/to/your/workspace`. On macOS, run `./setup.sh desktop` to bui
 open an installed CLI and sign in with your own account.
 
 The installer includes the local Node service. It does not include Codex,
-Claude Code, OpenCode, Kimi, Blender, Python or provider accounts.
+Claude Code, Antigravity, OpenCode, Kimi, Blender, Python or provider accounts.
 
-**Already using Mr. Mak?** Read the [0.5.0 update notes](CHANGELOG.md) for
-mobile chat access, voice dictation and the Linux AppImage packaging fix.
+**Already using Mr. Mak?** Read the [0.5.1 update notes](CHANGELOG.md) for
+Antigravity, macOS improvements, mobile navigation, local voice options and
+release security changes.
 Follow the
 [update guide](docs/updating.md) to update the app and add skills to your existing
 repository without replacing your projects.

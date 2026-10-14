@@ -30,6 +30,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s .agents/skills/fal-ai-generation/scripts -p test_fal_job.py -v
+      - run: python -m unittest forge.tests.test_optional_vision_tooling -v
+        working-directory: .agents/skills/img2threejs
       - run: python scripts/test-local-voice-setup.py
   linux:
     runs-on: ubuntu-latest

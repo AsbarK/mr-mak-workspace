@@ -5,7 +5,7 @@ import path from 'node:path';
 import pty from 'node-pty';
 import headless from '@xterm/headless';
 import { TerminalSnapshotAddon } from './terminal-snapshot.mjs';
-import { terminalCommand, childEnvironment } from './agents.mjs';
+import { terminalCommand, childEnvironment, nativeConversationId } from './agents.mjs';
 import { readJson, saveJson } from './util.mjs';
 import { claudeTranscript, codexTranscript, tailNativeFile } from './native-events.mjs';
 import { findCodexChat } from './codex-history.mjs';
@@ -13,6 +13,7 @@ import { englishTitle, restoredTitle } from './titles.mjs';
 import { defaultWorkerEffort, workerEfforts } from './effort.mjs';
 import { ptyOptions } from './platform.mjs';
 import { opencodeVersion, opencodeEnvironment, readOpencodeState, watchOpencode } from './opencode.mjs';
+import { prepareAntigravityLog, readAntigravityConversation, validAntigravityId, watchAntigravity } from './antigravity.mjs';
 
 const { Terminal } = headless;
 const publicSession = session => {
@@ -45,7 +46,7 @@ export class Sessions extends EventEmitter {
   }
 
   make(metadata) {
-    return { activity: 'idle', unread: false, completionVersion: 0, tabOrder: this.items.size, tabColor: null, ...metadata, effort: ['codex', 'claude'].includes(metadata.agent) ? metadata.effort || defaultWorkerEffort : undefined, terminal: null, serializer: null, process: null, sequence: 0, pendingOutput: '', outputTimer: null };
+    return { activity: 'idle', unread: false, completionVersion: 0, tabOrder: this.items.size, tabColor: null, ...metadata, effort: ['codex', 'claude', 'antigravity'].includes(metadata.agent) ? metadata.effort || defaultWorkerEffort : undefined, terminal: null, serializer: null, process: null, sequence: 0, pendingOutput: '', outputTimer: null };
   }
 
   async hydrate(session) {
@@ -87,6 +88,7 @@ export class Sessions extends EventEmitter {
     if (this.closed) throw new Error('Mr. Mak is shutting down');
     if (this.active().length >= 80) throw new Error('Close a tab before opening another (80 open tab limit). Closed chats remain in History.');
     const agent = String(options.agent || 'codex');
+    nativeConversationId(options.resumeId);
     if (options.effort && !workerEfforts.includes(options.effort)) throw new Error('Reasoning effort must be medium, high, xhigh or max.');
     const cwd = path.resolve(options.cwd || this.repo);
     if (!(await stat(cwd)).isDirectory()) throw new Error('Working folder must be a directory');
@@ -109,8 +111,9 @@ export class Sessions extends EventEmitter {
   }
 
   async importConversation({ agent, nativeId, name, cwd, pinned = false, bypass = false }) {
-    if (!['codex', 'claude', 'opencode', 'kimi'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
-    nativeId = nativeId.trim();
+    if (!['codex', 'claude', 'antigravity', 'opencode', 'kimi'].includes(agent) || typeof nativeId !== 'string' || !nativeId.trim()) throw new Error('Choose an agent and its native conversation ID.');
+    nativeId = nativeConversationId(nativeId.trim());
+    if (agent === 'antigravity' && !validAntigravityId(nativeId)) throw new Error('Use the Antigravity conversation UUID from its /resume picker.');
     cwd = path.resolve(cwd || this.repo);
     if (!(await stat(cwd)).isDirectory()) throw new Error('Working folder must be a directory');
     const existing = [...this.items.values()].find(item => item.agent === agent && item.nativeId === nativeId);
@@ -133,7 +136,9 @@ export class Sessions extends EventEmitter {
       env = opencodeEnvironment(env, { stateDir: this.stateDir, session, major: opencodeMajor });
     }
     if (this.closed || !session.open) throw new Error('The chat was closed before its terminal started.');
-    const command = terminalCommand(session.agent, { bypass: session.bypass, resumeId, nativeId: session.nativeId, effort: session.effort, opencodeMajor });
+    if (session.agent === 'antigravity' && resumeId && !validAntigravityId(resumeId)) throw new Error('Use the Antigravity conversation UUID from its /resume picker.');
+    const antigravityLog = session.agent === 'antigravity' ? await prepareAntigravityLog(this.stateDir, session.id) : undefined;
+    const command = terminalCommand(session.agent, { bypass: session.bypass, resumeId, nativeId: session.nativeId, effort: session.effort, opencodeMajor, antigravityLog });
     if (session.agent === 'codex') env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE = `mrmak_chat_${session.id}`;
     const proc = pty.spawn(command.file, command.args, ptyOptions({ cwd: session.cwd, env, cols: session.cols, rows: session.rows }));
     session.process = proc;
@@ -173,6 +178,7 @@ export class Sessions extends EventEmitter {
       session.exitCode = exitCode;
       this.changed(session);
       this.emit('notice', { id: randomUUID(), sessionId: session.id, name: session.name, kind: 'exit', text: `${session.name} exited (${exitCode}).`, at: new Date().toISOString() });
+      if (session.agent === 'antigravity') this.recoverNative(session).catch(() => {});
       if (session.agent === 'codex' && !session.nativeId) this.read(session.id).then(({ screen }) => {
         const match = /codex resume ([a-f0-9-]{36})/i.exec(screen);
         if (match) { session.nativeId = match[1]; this.changed(session); }
@@ -187,6 +193,9 @@ export class Sessions extends EventEmitter {
     this.changed(session);
     // Discovery is read-only, and only accepts an unambiguous native session.
     this.beginDiscovery(session);
+    if (session.agent === 'antigravity') session.stopNativeWatch = watchAntigravity(this.stateDir, session.id, id => {
+      if (session.process === proc) this.bindAntigravity(session, id);
+    });
     if (session.agent === 'opencode') session.stopNativeWatch = watchOpencode(this.stateDir, session, env.MRMAK_OPENCODE_LAUNCH_ID, state => {
       this.bindNative(session, { id: state.nativeId });
       if (session.nativeId !== state.nativeId) return;
@@ -255,6 +264,10 @@ export class Sessions extends EventEmitter {
   }
 
   async recoverNative(session) {
+    if (session.agent === 'antigravity') {
+      this.bindAntigravity(session, await readAntigravityConversation(this.stateDir, session.id));
+      return;
+    }
     if (session.agent === 'opencode' && !session.nativeId) {
       const state = await readOpencodeState(this.stateDir, session.id);
       if (state) this.bindNative(session, { id: state.nativeId });
@@ -262,6 +275,12 @@ export class Sessions extends EventEmitter {
     }
     if (session.agent !== 'codex' || session.nativeId) return;
     this.bindNative(session, await findCodexChat(session, { full: true }));
+  }
+
+  bindAntigravity(session, id) {
+    if (!id || id === session.nativeId || [...this.items.values()].some(item => item !== session && item.agent === 'antigravity' && item.nativeId === id)) return;
+    session.nativeId = id; session.hasConversation = true; session.restoreError = null;
+    this.changed(session);
   }
 
   flushOutput(session) {
@@ -317,7 +336,9 @@ export class Sessions extends EventEmitter {
     if (!coordinator && !/^\x1b\[[?>0-9;]*[RcnIO]$/.test(data)) session.lastInputAt = new Date().toISOString();
     if (data.includes('\r') || submit) {
       this.beginDiscovery(session);
-      if (session.agent !== 'shell') session.hasConversation = true;
+      // Antigravity's first Enter can be login, theme or workspace-trust setup.
+      // Only its native conversation event proves there is history to resume.
+      if (!['shell', 'antigravity'].includes(session.agent)) session.hasConversation = true;
       session.updatedAt = new Date().toISOString();
     }
     this.changed(session);
@@ -390,7 +411,7 @@ export class Sessions extends EventEmitter {
   requestStop(session) {
     const proc = session.process;
     if (!proc) return;
-    if (session.agent !== 'opencode') { proc.kill(); return; }
+    if (!['opencode', 'antigravity'].includes(session.agent)) { proc.kill(); return; }
     // Let OpenCode flush and close its SQLite store before ConPTY is destroyed.
     // Ctrl+C cancels work; a second press exits the native TUI. Custom keymaps
     // or an unresponsive CLI still have a bounded hard-stop fallback.
@@ -399,6 +420,7 @@ export class Sessions extends EventEmitter {
     setTimeout(() => { try { if (session.process === proc) proc.kill(); } catch { /* Process already exited. */ } }, 3500).unref();
   }
   async resume(id, nativeId) {
+    nativeConversationId(nativeId);
     if (this.closed) throw new Error('Mr. Mak is shutting down');
     const session = this.get(id);
     if (session.stopping) await session.stopping;
@@ -460,7 +482,7 @@ export class Sessions extends EventEmitter {
     this.closed = true; clearInterval(this.timer);
     // Preserve the open-tab flags on app quit while giving OpenCode time to
     // close the database used by the next launch.
-    await Promise.all([...this.items.values()].filter(s => s.agent === 'opencode' && s.process).map(session => new Promise(resolve => {
+    await Promise.all([...this.items.values()].filter(s => ['opencode', 'antigravity'].includes(s.agent) && s.process).map(session => new Promise(resolve => {
       const proc = session.process;
       const timer = setTimeout(() => { subscription.dispose(); resolve(); }, 5000);
       const subscription = proc.onExit(() => { clearTimeout(timer); subscription.dispose(); resolve(); });

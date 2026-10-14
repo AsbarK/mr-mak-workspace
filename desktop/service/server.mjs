@@ -5,7 +5,7 @@ import { watch } from 'node:fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { parse as parseEnv } from 'dotenv';
 import { Sessions } from './sessions.mjs';
-import { Coordinator } from './coordinator.mjs';
+import { Coordinator, openChatArguments } from './coordinator.mjs';
 import { Files, serveFile } from './files.mjs';
 import { importFile, dragFiles, moveFile, recyclePath, MAX_FILE_BYTES } from './file-transfers.mjs';
 import { inventory } from './agents.mjs';
@@ -100,9 +100,9 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         case 'close_chat': return closeChat(args.id);
         case 'pin_chat': return sessions.pin(args.id, args.pinned);
         case 'open_chat': {
-          if (args.bypass != null && typeof args.bypass !== 'boolean') throw new Error('Choose a valid chat permission setting.');
+          args = openChatArguments(args);
           if (args.bypass === true && settings.defaultBypass !== true) throw new Error('To enable bypass, choose it yourself in New chat or Settings. Mr. Mak cannot raise the selected permission level.');
-          const session = await sessions.create({ ...args, name: taskTitle(args.name), effort: taskEffort(latestRequest, args.effort), bypass: args.bypass === false ? false : settings.defaultBypass === true });
+          const session = await sessions.create({ agent: args.agent, cwd: args.cwd, name: taskTitle(args.name), effort: taskEffort(latestRequest, args.effort), bypass: args.bypass === false ? false : settings.defaultBypass === true });
           focus(session.id); return session;
         }
         case 'read_chat': return sessions.read(args.id);
@@ -177,7 +177,7 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
     try {
       const url = new URL(request.url, origin);
       if (request.headers.host !== new URL(origin).host) throw Object.assign(new Error('Unexpected host'), { status: 403 });
-      if (url.pathname === '/health') return json(response, 200, { service: 'mrmak', version: '0.5.0' });
+      if (url.pathname === '/health') return json(response, 200, { service: 'mrmak', version: '0.5.1' });
       if (url.pathname.startsWith('/api/')) {
         authorize(request);
         const method = request.method;

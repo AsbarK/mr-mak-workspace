@@ -1,7 +1,12 @@
 # Changelog
 
-## 0.5.1 - Unreleased
+## 0.5.1 - 2026-10-14
 
+- Add Antigravity CLI chats with Google sign-in, reasoning effort, per-chat native history recovery and MCP inventory. Install `agy` separately, then choose it in New chat. Model access remains controlled by Google.
+- Harden release jobs: build with read-only tokens and no saved Git credentials, separate dependency checks from tag publication, pin Actions to full commit hashes and disable npm caches in release workflows. Dependabot tracks the pinned Actions.
+- Update the optional img2threejs vision environment to Transformers 5.10.0. Pin Hugging Face model revisions and verify MediaPipe downloads with SHA-256, including cached files.
+- Validate conversation IDs and voice coordinator chat options on the server. Read malformed HTML reports without repeated backtracking.
+- Launch native Windows CLI executables directly, avoiding the encoded PowerShell wrapper that triggered the reported Norton block. Command scripts still use the full PowerShell path.
 - Improve macOS support: native app/DMG packaging, Finder and Dock behavior, Command-key shortcuts, drag and drop, microphone permission and a bundled Node runtime. A login-shell timeout keeps launch responsive. CI archives retain executable permissions.
 - Start Windows agent chats through the full PowerShell path, even when its folder is missing from PATH.
 - Support CLI selection copy through OSC 52 after a foreground selection or Copy gesture. Background output and clipboard read requests are rejected.
@@ -15,6 +20,8 @@
 - Retry card saves when Windows briefly locks the registry, preserving the latest metadata and cleaning up unsuccessful temporary writes.
 - Add left/right terminal arrows on phones for CLI menus such as reasoning effort. Keep all keys visible with touch-sized buttons that wrap on narrow screens.
 - Close an agent chat from the phone after confirmation. Its desktop tab closes too; the saved conversation stays in History and the phone retains its unsent draft.
+
+Thanks to @pbau3r-sfdy, @serhat1akman and @redDwarf03 for the contributions and reports. Outstanding security work remains tracked separately; this release does not close the full security review.
 
 ## 0.5.0 - 2026-10-09
 
