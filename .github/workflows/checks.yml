@@ -8,8 +8,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
@@ -26,7 +26,7 @@ jobs:
       - run: powershell -NoProfile -File scripts/test-update-helpers.ps1
       - run: node desktop/service/test/mobile-ui.mjs
       - run: node desktop/service/test/workspace-edit-ui.mjs
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s .agents/skills/fal-ai-generation/scripts -p test_fal_job.py -v
@@ -34,12 +34,14 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
       - run: sudo apt-get update && sudo apt-get install -y build-essential file libssl-dev libwebkit2gtk-4.1-dev libappindicator3-dev libxdo-dev librsvg2-dev libwayland-dev patchelf
       - run: npm ci
       - run: npm run lint
@@ -50,7 +52,7 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml login_path::tests
       - run: python3 scripts/test-local-voice-setup.py
       - name: Upload Linux AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mr-mak-workspace-linux-appimage
           path: src-tauri/target/release/bundle/appimage/*.AppImage
@@ -59,12 +61,14 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -88,7 +92,7 @@ jobs:
         run: |
           ditto -c -k --sequesterRsrc --keepParent "src-tauri/target/release/bundle/macos/Mr. Mak Workspace.app" mr-mak-workspace-macos.zip
       - name: Upload macOS app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mr-mak-workspace-macos-app
           path: mr-mak-workspace-macos.zip
