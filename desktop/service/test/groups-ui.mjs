@@ -131,10 +131,35 @@ try {
   await page.locator('.chat-options select[aria-label="Group"]').selectOption('');
   await page.locator('.chat-tab-group[data-chat-group="ThugLife"] .chat-tab').filter({ hasText: 'Producer' }).waitFor({ state: 'detached' });
   assert.equal(service.sessions.get(created.id).group, null);
+
+  // Right-click a chip to rename the group; a taken name is offered as a merge.
+  await chip('ThugLife').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Rename group' }).click();
+  await page.locator('.tab-menu-rename input').fill('Dungeon');
+  assert.equal(await page.locator('.tab-menu-rename button').textContent(), 'Merge');
+  await page.locator('.tab-menu-rename input').fill('Studio');
+  assert.equal(await page.locator('.tab-menu-rename button').textContent(), 'Save');
+  await page.locator('.tab-menu-rename input').press('Enter');
+  await chip('Studio').waitFor();
+  assert.deepEqual(await groupNames('Studio'), ['Director', 'Network', 'Animator']);
+  assert.equal(service.sessions.get('g-0').group, 'Studio');
+
+  // Dragging a chip moves the whole group, and the drag does not collapse it.
+  const grab = await chip('Dungeon').boundingBox();
+  const studio = await page.locator('.chat-tab-group[data-chat-group="Studio"]').boundingBox();
+  await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+  await page.mouse.down();
+  for (let step = 1; step <= 12; step++) await page.mouse.move(grab.x + grab.width / 2 + (studio.x + 8 - grab.x - grab.width / 2) * step / 12, grab.y + grab.height / 2 + (studio.y + studio.height / 2 - grab.y - grab.height / 2) * step / 12);
+  await page.locator('.chat-tab-group.drop-before[data-chat-group="Studio"]').waitFor();
+  assert.equal(await page.locator('.group-ghost').count(), 1);
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('.chat-group-chip .chip-name')?.textContent === 'Dungeon');
+  assert.deepEqual(await page.locator('.chat-group-chip .chip-name').allTextContents(), ['Dungeon', 'Studio']);
+  assert.equal(await page.locator('.chat-tab-group.collapsed').count(), 0);
   assert.equal(await page.locator('.desktop-error').count(), 0);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(repo, 'groups.png') });
-  console.log(`Groups UI passed: chips, collapse across reload, tab menu with rename, pin, tab color and groups, group color from the chip menu, new group, ungroup, drop on chip, New chat picker and options picker. Screenshot: ${path.join(repo, 'groups.png')}`);
+  console.log(`Groups UI passed: chips, collapse across reload, tab menu with rename, pin, tab color and groups, group color from the chip menu, new group, ungroup, drop on chip, New chat picker, options picker, group rename and group drag. Screenshot: ${path.join(repo, 'groups.png')}`);
 } finally {
   await browser?.close(); await service?.close();
 }

@@ -11,7 +11,7 @@ import { importFile, dragFiles, moveFile, recyclePath, MAX_FILE_BYTES } from './
 import { inventory } from './agents.mjs';
 import { Attachments, attachmentText, MAX_IMAGE_BYTES } from './attachments.mjs';
 import { ContextLibrary } from './context.mjs';
-import { taskTitle } from './titles.mjs';
+import { groupLabel, taskTitle } from './titles.mjs';
 import { taskEffort } from './effort.mjs';
 import { Workspace, localDay, metadataPatch } from './workspace.mjs';
 import { QuickActions } from './quick-actions.mjs';
@@ -270,6 +270,22 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
           await saveSettings(); broadcast('settings', { settings }); return json(response, 200, settings);
         }
         if (method === 'POST' && url.pathname === '/api/sessions') { const session = await sessions.create({ ...data, bypass: data.bypass ?? settings.defaultBypass }); await integrations.publish('session', { event: 'started', session }); focus(session.id); return json(response, 201, session); }
+        if (method === 'POST' && url.pathname === '/api/groups/move') return json(response, 200, await sessions.moveGroup(data.group, data.pinned, data.targetId, data.position));
+        if (method === 'POST' && url.pathname === '/api/groups/rename') {
+          // A renamed group keeps its color and collapsed state; merging into an
+          // existing group keeps that group's.
+          const from = groupLabel(data.from), to = groupLabel(data.to);
+          const merging = sessions.list().some(item => item.group === to);
+          const result = await sessions.renameGroup(from, to);
+          if (from !== to) {
+            const { [from]: color, ...colors } = settings.groupColors || {};
+            settings.groupColors = color && !merging ? { ...colors, [to]: color } : colors;
+            const collapsed = settings.collapsedGroups || [];
+            settings.collapsedGroups = [...new Set(collapsed.filter(item => item !== from).concat(collapsed.includes(from) && !merging ? [to] : []))];
+            await saveSettings(); broadcast('settings', { settings });
+          }
+          return json(response, 200, result);
+        }
         const sessionRoute = /^\/api\/sessions\/([\w-]+)(?:\/(\w+))?$/.exec(url.pathname);
         if (sessionRoute) {
           const [, id, action] = sessionRoute;

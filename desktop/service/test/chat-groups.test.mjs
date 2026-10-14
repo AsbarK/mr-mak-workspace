@@ -66,6 +66,37 @@ test('dragging beside another group joins it and dragging beside an ungrouped ta
   } finally { await sessions.close(); }
 });
 
+test('a group moves as one block and renaming relabels it everywhere', async () => {
+  const { sessions } = await fixture();
+  try {
+    await sessions.assign('c', 'Town');
+    await sessions.moveGroup('Dungeon', false, 'a', 'before');
+    assert.deepEqual(ids(sessions), ['f', 'b', 'd', 'a', 'c']);
+    assert.deepEqual(sessions.list().filter(item => !item.pinned).map(item => item.id), ['b', 'd', 'e', 'a', 'c'], 'the closed member travels with its group');
+    await sessions.moveGroup('Dungeon', false, 'c', 'after');
+    assert.deepEqual(ids(sessions), ['f', 'a', 'c', 'b', 'd'], 'a target inside a group means beside the whole group');
+    await sessions.moveGroup('Town', false, 'd', 'after');
+    assert.deepEqual(ids(sessions), ['f', 'a', 'b', 'd', 'c']);
+    assert.deepEqual(orderedChats([...sessions.items.values()]).map(item => item.id), ids(sessions));
+    await assert.rejects(sessions.moveGroup('Dungeon', false, 'f', 'before'), /Pinned tabs stay together/);
+    await assert.rejects(sessions.moveGroup('Nowhere', false, 'a', 'before'), /no open tabs/);
+    await assert.rejects(sessions.moveGroup('Dungeon', false, 'a', 'inside'), /valid tab position/);
+    const unchanged = sessions.list();
+    await sessions.moveGroup('Dungeon', true, 'f', 'before');
+    assert.deepEqual(sessions.list(), unchanged, 'dropping a group beside itself changes nothing');
+
+    await sessions.renameGroup('Dungeon', ' Crypt ');
+    assert.deepEqual(['b', 'd', 'e', 'f'].map(id => sessions.get(id).group), ['Crypt', 'Crypt', 'Crypt', 'Crypt'], 'closed and pinned members are renamed too');
+    assert.deepEqual(ids(sessions), ['f', 'a', 'b', 'd', 'c']);
+    await sessions.renameGroup('Town', 'Crypt');
+    assert.deepEqual(groupedChats([...sessions.items.values()]).map(group => [group.name, group.items.map(item => item.id)]), [['Crypt', ['f']], [null, ['a']], ['Crypt', ['b', 'd', 'c']]], 'a taken name merges the groups');
+    await assert.rejects(sessions.renameGroup('Town', 'Keep'), /no longer exists/);
+    await assert.rejects(sessions.renameGroup('Crypt', '  '), /Name the group/);
+    await assert.rejects(sessions.renameGroup('Crypt', 'Склеп'), /English group name/);
+    assert.equal(sessions.get('b').group, 'Crypt', 'a refused rename changes nothing');
+  } finally { await sessions.close(); }
+});
+
 test('groups persist across restart and the HTTP routes validate group input', async () => {
   const { sessions, repo } = await fixture();
   let reopened;
@@ -96,5 +127,26 @@ test('groups persist across restart and the HTTP routes validate group input', a
     const colors = await (await request('/settings', { groupColors: { Dungeon: '#91B6DA', Bad: 'red', ['x'.repeat(61)]: '#000000', Odd: 7 } }, 'POST')).json();
     assert.deepEqual(colors.groupColors, { Dungeon: '#91b6da' });
     assert.deepEqual((await (await request('/settings', { groupColors: {} }, 'POST')).json()).groupColors, {});
+
+    // Renaming carries the group's color and collapsed state; a merge keeps the target's.
+    await request('/settings', { groupColors: { Dungeon: '#91b6da', Team: '#dba3bb' }, collapsedGroups: ['Dungeon'] }, 'POST');
+    const renamed = await request('/groups/rename', { from: 'Dungeon', to: 'Keep' }, 'POST');
+    assert.equal(renamed.status, 200);
+    assert.deepEqual((await renamed.json()).map(item => item.group), ['Keep', null, 'Keep', 'Keep', 'Keep']);
+    let saved = await (await fetch(service.origin + '/api/bootstrap', { headers: { Authorization: `Bearer ${service.token}` } })).json();
+    assert.deepEqual([saved.settings.groupColors, saved.settings.collapsedGroups], [{ Team: '#dba3bb', Keep: '#91b6da' }, ['Keep']]);
+    await request('/sessions/a', { group: 'Team' }, 'PATCH');
+    await request('/groups/rename', { from: 'Keep', to: 'Team' }, 'POST');
+    saved = await (await fetch(service.origin + '/api/bootstrap', { headers: { Authorization: `Bearer ${service.token}` } })).json();
+    assert.deepEqual([saved.settings.groupColors, saved.settings.collapsedGroups], [{ Team: '#dba3bb' }, []]);
+    assert.equal(service.sessions.get('e').group, 'Team');
+    const missing = await request('/groups/rename', { from: 'Keep', to: 'Other' }, 'POST');
+    assert.equal(missing.status, 404);
+    await request('/sessions/c', { group: 'Solo' }, 'PATCH');
+    const moved = await request('/groups/move', { group: 'Solo', pinned: false, targetId: 'a', position: 'before' }, 'POST');
+    assert.equal(moved.status, 200);
+    assert.deepEqual((await moved.json()).map(item => item.id), ['f', 'c', 'a', 'b', 'd']);
+    const across = await request('/groups/move', { group: 'Solo', pinned: false, targetId: 'f', position: 'after' }, 'POST');
+    assert.match((await across.json()).error, /Pinned tabs stay together/);
   } finally { await service.close(); }
 });

@@ -6,8 +6,9 @@ import { Icon } from './Icons'
 import SessionLogo from './SessionLogo'
 import { groupedChats, tabColors, type TabGroup } from './chatOrder'
 
-type Drag = { id: string; pinned: boolean; startX: number; startY: number; moving: boolean }
-type Drop = { id: string; position: 'before' | 'after' } | { group: string }
+/** A drag carries one tab, or a whole group when it starts on the group's chip. */
+type Drag = { id: string; group?: string; pinned: boolean; startX: number; startY: number; moving: boolean }
+type Drop = { id: string; position: 'before' | 'after' } | { group: string } | { beside: string; pinned: boolean; targetId: string; position: 'before' | 'after' }
 type Menu = { kind: 'tab'; item: ChatSession; x: number; y: number } | { kind: 'group'; group: TabGroup; x: number; y: number }
 
 function Swatches({ label, value, onChange }: { label: string; value: string | null; onChange: (value: string | null) => void }) {
@@ -24,7 +25,7 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
   const gesture = useRef<Drag | null>(null)
   const drop = useRef<Drop | null>(null)
   const suppressClick = useRef(false)
-  const [dragging, setDragging] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState<{ id: string; group?: string; pinned: boolean; x: number; y: number } | null>(null)
   const [target, setTarget] = useState<Drop | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [draft, setDraft] = useState('')
@@ -50,10 +51,11 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
   const openMenu = (event: React.MouseEvent, value: Menu) => { event.preventDefault(); event.stopPropagation(); setDraft(''); setRename(null); setMenu(value) }
   const patch = (id: string, data: object) => { setMenu(null); api(`/sessions/${id}`, data, 'PATCH').catch(reportError) }
   const ungroup = (group: TabGroup) => { setMenu(null); Promise.all(group.items.map(item => api(`/sessions/${item.id}`, { group: null }, 'PATCH'))).catch(reportError) }
-  function begin(event: React.PointerEvent<HTMLButtonElement>, item: ChatSession) {
+  const renameGroup = (from: string, to: string) => { setMenu(null); setRename(null); if (to !== from) api('/groups/rename', { from, to }).catch(reportError) }
+  function begin(event: React.PointerEvent<HTMLButtonElement>, item: ChatSession, group?: string) {
     if (event.button !== 0) return
     suppressClick.current = false
-    gesture.current = { id: item.id, pinned: item.pinned, startX: event.clientX, startY: event.clientY, moving: false }
+    gesture.current = { id: item.id, group, pinned: item.pinned, startX: event.clientX, startY: event.clientY, moving: false }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   function move(event: React.PointerEvent<HTMLButtonElement>) {
@@ -61,12 +63,19 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
     if (!current) return
     if (!current.moving && Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < 6) return
     current.moving = true; suppressClick.current = true
-    setDragging({ id: current.id, x: event.clientX, y: event.clientY })
+    setDragging({ id: current.id, group: current.group, pinned: current.pinned, x: event.clientX, y: event.clientY })
     const point = document.elementFromPoint(event.clientX, event.clientY)
     const element = point?.closest<HTMLElement>('[data-chat-tab]')
     const item = items.find(item => item.id === element?.dataset.chatTab)
+    const side = (box: HTMLElement) => { const rect = box.getBoundingClientRect(); return event.clientX >= rect.left + rect.width / 2 ? 'after' : 'before' }
     let next: Drop | null = null
-    if (element && item && item.id !== current.id && item.pinned === current.pinned) {
+    if (current.group) {
+      // A group lands beside an ungrouped tab or beside another whole group.
+      const box = point?.closest<HTMLElement>('[data-chat-group]')
+      const other = box ? grouped.find(group => group.name === box.dataset.chatGroup && group.pinned === current.pinned && group.name !== current.group) : undefined
+      if (box && other) next = { beside: other.name!, pinned: other.pinned, targetId: other.items[0].id, position: side(box) }
+      else if (!box && element && item && !item.group && item.pinned === current.pinned) next = { id: item.id, position: side(element) }
+    } else if (element && item && item.id !== current.id && item.pinned === current.pinned) {
       const rect = element.getBoundingClientRect()
       next = { id: item.id, position: event.clientX >= rect.left + rect.width / 2 ? 'after' : 'before' }
     } else {
@@ -81,30 +90,44 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
     const current = gesture.current, destination = drop.current
     clear()
     if (!current?.moving || !destination) return
-    if ('group' in destination) api(`/sessions/${current.id}`, { group: destination.group }, 'PATCH').catch(reportError)
-    else api(`/sessions/${current.id}/reorder`, { targetId: destination.id, position: destination.position }).catch(reportError)
+    if (current.group) {
+      const targetId = 'beside' in destination ? destination.targetId : 'id' in destination ? destination.id : null
+      if (targetId && 'position' in destination) api('/groups/move', { group: current.group, pinned: current.pinned, targetId, position: destination.position }).catch(reportError)
+    }
+    else if ('group' in destination) api(`/sessions/${current.id}`, { group: destination.group }, 'PATCH').catch(reportError)
+    else if ('id' in destination) api(`/sessions/${current.id}/reorder`, { targetId: destination.id, position: destination.position }).catch(reportError)
   }
-  const dragged = items.find(item => item.id === dragging?.id)
-  const renderTab = (item: ChatSession) => <div key={item.id} data-chat-tab={item.id} className={`chat-tab ${selectedId === item.id ? 'selected' : ''} ${item.tabColor ? 'has-color' : ''} ${dragging?.id === item.id ? 'dragging' : ''} ${target && 'id' in target && target.id === item.id ? `drop-${target.position}` : ''}`} style={{ '--tab-accent': item.tabColor || '#dfa3b8' } as React.CSSProperties} onContextMenu={event => openMenu(event, { kind: 'tab', item, x: event.clientX, y: event.clientY })}>
+  const dragged = dragging?.group ? undefined : items.find(item => item.id === dragging?.id)
+  const draggedGroup = dragging?.group ? grouped.find(group => group.name === dragging.group && group.pinned === dragging.pinned) : undefined
+  const renderTab = (item: ChatSession) => <div key={item.id} data-chat-tab={item.id} className={`chat-tab ${selectedId === item.id ? 'selected' : ''} ${item.tabColor ? 'has-color' : ''} ${!dragging?.group && dragging?.id === item.id ? 'dragging' : ''} ${target && 'id' in target && target.id === item.id ? `drop-${target.position}` : ''}`} style={{ '--tab-accent': item.tabColor || '#dfa3b8' } as React.CSSProperties} onContextMenu={event => openMenu(event, { kind: 'tab', item, x: event.clientX, y: event.clientY })}>
     <button role="tab" aria-selected={selectedId === item.id} onClick={event => { if (!suppressClick.current || event.detail === 0) choose(item.id) }} onPointerDown={event => begin(event, item)} onPointerMove={move} onPointerUp={finish} onPointerCancel={clear} onLostPointerCapture={clear}
       className="chat-tab-select" aria-label={`${item.name} · ${chatActivityLabel(item)}`} title={`${agents.find(a => a.id === item.agent)?.label} · ${item.name}${item.group ? ` · ${item.group}` : ''}\n${chatActivityLabel(item)}\nDrag to reorder ${item.pinned ? 'pinned' : 'unpinned'} tabs · right-click for options\n${item.cwd}`}>
       <span style={{ color: agents.find(a => a.id === item.agent)?.color }}><SessionLogo session={item} /></span><span className="chat-tab-name">{item.name}</span>{item.pinned && <span className="tab-pinned" title="Pinned in History"><Icon name="pin" size={11} /></span>}
     </button>
     <button className="chat-tab-close" onClick={() => close(item.id)} aria-label={`Close ${item.name}`} title="Close tab · keep in History"><Icon name="close" size={12} /></button>
   </div>
+  // Reorders arrive one tab at a time, so a group can be split for a moment; a
+  // second run of the same group needs its own key or React leaves a stale copy.
+  const runs = new Map<string, number>()
   return <div className={`chat-tabs ${dragging ? 'is-reordering' : ''}`} role="tablist" aria-label="Agent chats">
     {grouped.map(group => {
       if (!group.name) return group.items.map(renderTab)
+      const key = `group:${group.pinned}:${group.name}`, run = (runs.get(key) || 0) + 1
+      runs.set(key, run)
       const folded = collapsed.includes(group.name)
-      return <div key={`group:${group.pinned}:${group.name}`} data-chat-group={group.name} className={`chat-tab-group ${folded ? 'collapsed' : ''} ${group.working ? 'working' : ''} ${target && 'group' in target && target.group === group.name ? 'drop-into' : ''}`} style={{ '--tab-accent': group.color } as React.CSSProperties}>
-        <button type="button" className="chat-group-chip" aria-expanded={!folded} aria-label={`${group.name} group · ${group.items.length} tabs${group.unread ? ' · unread result' : ''}`} title={`${group.name} · ${group.items.length} tabs\nClick to ${folded ? 'expand' : 'collapse'} · right-click for color and options · drop a tab here to add it`} onClick={() => toggleGroup(group.name!)} onContextMenu={event => openMenu(event, { kind: 'group', group, x: event.clientX, y: event.clientY })}>
+      const moving = draggedGroup?.name === group.name && draggedGroup.pinned === group.pinned
+      const beside = target && 'beside' in target && target.beside === group.name && target.pinned === group.pinned ? `drop-${target.position}` : ''
+      return <div key={run > 1 ? `${key}:${run}` : key} data-chat-group={group.name} className={`chat-tab-group ${folded ? 'collapsed' : ''} ${group.working ? 'working' : ''} ${moving ? 'dragging' : ''} ${beside} ${target && 'group' in target && target.group === group.name ? 'drop-into' : ''}`} style={{ '--tab-accent': group.color } as React.CSSProperties}>
+        <button type="button" className="chat-group-chip" aria-expanded={!folded} aria-label={`${group.name} group · ${group.items.length} tabs${group.unread ? ' · unread result' : ''}`} title={`${group.name} · ${group.items.length} tabs\nClick to ${folded ? 'expand' : 'collapse'} · drag to move the group · right-click to rename, color and more · drop a tab here to add it`}
+          onClick={event => { if (!suppressClick.current || event.detail === 0) toggleGroup(group.name!) }} onPointerDown={event => begin(event, group.items[0], group.name!)} onPointerMove={move} onPointerUp={finish} onPointerCancel={clear} onLostPointerCapture={clear} onContextMenu={event => openMenu(event, { kind: 'group', group, x: event.clientX, y: event.clientY })}>
           <span className="chip-caret" aria-hidden="true">{folded ? '▸' : '▾'}</span><span className="chip-name">{group.name}</span><small>{group.items.length}</small>{group.unread && <i className="chip-unread" title="Unread result" />}{group.working && <i className="chip-working" title="Working" />}
         </button>
         {group.items.filter(item => !folded || item.id === selectedId).map(renderTab)}
       </div>
     })}
     {dragging && dragged && <div className="chat-tab-ghost" style={{ left: dragging.x + 13, top: dragging.y + 13, color: dragged.tabColor || '#d8c9da' }} aria-hidden="true"><SessionLogo session={dragged} /><span>{dragged.name}</span>{dragged.pinned && <Icon name="pin" size={12} />}</div>}
-    {menu && <div className="tab-menu" role="menu" style={{ left: Math.max(4, Math.min(menu.x, window.innerWidth - 260)), top: Math.max(4, Math.min(menu.y, window.innerHeight - (menu.kind === 'tab' ? 470 : 250))) }}>
+    {dragging && draggedGroup && <div className="chat-tab-ghost group-ghost" style={{ left: dragging.x + 13, top: dragging.y + 13, color: draggedGroup.color }} aria-hidden="true"><span className="chip-caret">▾</span><span>{draggedGroup.name}</span><small>{draggedGroup.items.length}</small></div>}
+    {menu && <div className="tab-menu" role="menu" style={{ left: Math.max(4, Math.min(menu.x, window.innerWidth - 260)), top: Math.max(4, Math.min(menu.y, window.innerHeight - (menu.kind === 'tab' ? 470 : 290))) }}>
       {menu.kind === 'tab' ? <>
         <strong>{menu.item.name}</strong>
         {rename === null ? <button type="button" role="menuitem" onClick={() => setRename(menu.item.name)}>Rename chat</button> : <form className="tab-menu-rename" onSubmit={event => { event.preventDefault(); if (rename.trim()) patch(menu.item.id, { name: rename.trim() }) }}><input autoFocus value={rename} maxLength={100} aria-label="English chat name" onChange={event => setRename(event.target.value)} /><button type="submit">Save</button></form>}
@@ -122,6 +145,12 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
         <button type="button" role="menuitem" onClick={() => { setMenu(null); close(menu.item.id) }}>Close tab · keep in History</button>
       </> : <>
         <strong>{menu.group.name}</strong>
+        {rename === null ? <button type="button" role="menuitem" onClick={() => setRename(menu.group.name)}>Rename group</button> : (() => {
+          // Another group's name merges the two, so the button says so.
+          const to = rename.trim().replace(/\s+/g, ' ')
+          const merge = to !== menu.group.name && groups.includes(to)
+          return <form className="tab-menu-rename" onSubmit={event => { event.preventDefault(); if (to) renameGroup(menu.group.name!, to) }}><input autoFocus value={rename} maxLength={60} aria-label="English group name" onChange={event => setRename(event.target.value)} /><button type="submit" disabled={!to} title={merge ? `Move these tabs into the existing ${to} group` : undefined}>{merge ? 'Merge' : 'Save'}</button></form>
+        })()}
         <button type="button" role="menuitem" onClick={() => { setMenu(null); toggleGroup(menu.group.name!) }}>{collapsed.includes(menu.group.name!) ? 'Expand group' : 'Collapse group'}</button>
         <button type="button" role="menuitem" onClick={() => { setMenu(null); collapseOthers(menu.group.name!) }}>Collapse other groups</button>
         <span>Group color</span>

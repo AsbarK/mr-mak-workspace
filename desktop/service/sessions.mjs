@@ -416,6 +416,37 @@ export class Sessions extends EventEmitter {
     await this.persist();
     return this.active();
   }
+  // A group moves as one block, closed members included, beside an ungrouped
+  // tab or beside the whole of another group, never into the middle of one.
+  async moveGroup(name, pinned, targetId, position) {
+    const group = groupLabel(name), target = this.get(targetId);
+    if (!['before', 'after'].includes(position)) throw new Error('Choose a valid tab position.');
+    if (!target.open) throw new Error('Only open tabs can be reordered.');
+    if (target.pinned !== !!pinned) throw new Error('Pinned tabs stay together. Move a group within the pinned or the unpinned tabs.');
+    const siblings = this.list().filter(item => item.pinned === target.pinned);
+    const block = siblings.filter(item => item.group === group);
+    if (!group || !block.some(item => item.open)) throw Object.assign(new Error('That group has no open tabs.'), { status: 404 });
+    if (target.group === group) return this.active();
+    const rest = siblings.filter(item => item.group !== group);
+    const anchor = rest.map((item, index) => (target.group ? item.group === target.group : item.id === targetId) ? index : -1).filter(index => index >= 0);
+    rest.splice(position === 'after' ? anchor.at(-1) + 1 : anchor[0], 0, ...block);
+    rest.forEach((item, index) => { const changed = this.get(item.id); if (changed.tabOrder !== index) { changed.tabOrder = index; this.changed(changed); } });
+    await this.persist();
+    return this.active();
+  }
+  // Renaming relabels every chat in the group, History included. A name another
+  // group already uses merges the two.
+  async renameGroup(from, to) {
+    const source = groupLabel(from), name = groupLabel(to);
+    if (!name) throw new Error('Name the group.');
+    const members = [...this.items.values()].filter(item => source && item.group === source);
+    if (!members.length) throw Object.assign(new Error('That group no longer exists.'), { status: 404 });
+    if (name !== source) {
+      for (const session of members) { session.group = name; this.changed(session); }
+      await this.persist();
+    }
+    return this.active();
+  }
   async clearScreen(id) {
     const session = this.get(id); await this.hydrate(session);
     session.terminal.clear(); this.dirty = true;

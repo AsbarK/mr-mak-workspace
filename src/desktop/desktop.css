@@ -168,6 +168,10 @@
 .chat-group-chip .chip-caret{font-size:9px;opacity:.8}.chat-group-chip .chip-name{max-width:160px;overflow:hidden;text-overflow:ellipsis}.chat-group-chip small{font-weight:400;font-size:10px;color:#a9a3b2}
 .chat-group-chip .chip-unread,.chat-group-chip .chip-working{width:6px;height:6px;border-radius:50%;background:#f0a0b0;flex-shrink:0}.chat-group-chip .chip-working{background:#c395b3;animation:voice-dot 1s infinite alternate}
 .chat-tab-group.collapsed .chat-group-chip{border-radius:6px 6px 0 0}
+/* Dragging a chip moves the whole group: dim it and mark the side it will land on. */
+.chat-tab-group{position:relative}.chat-group-chip{touch-action:none;user-select:none}.chat-tab-group.dragging{opacity:.4}
+.chat-tab-group.drop-before:before,.chat-tab-group.drop-after:before{content:'';position:absolute;z-index:3;top:5px;bottom:5px;width:2px;background:#e7d6e3;border-radius:2px}.chat-tab-group.drop-before:before{left:-4px}.chat-tab-group.drop-after:before{right:-4px}
+.group-ghost .chip-caret{font-size:9px;opacity:.8}.group-ghost small{font-size:10px;color:#a9a3b2}
 .tab-menu{position:fixed;z-index:210;min-width:230px;max-width:280px;max-height:calc(100vh - 12px);overflow-y:auto;scrollbar-width:thin;padding:5px;border:1px solid #ffffff14;border-radius:9px;background:#1a1b22;box-shadow:0 14px 40px #0009;animation:panel-in .12s ease-out}
 .tab-menu>strong{display:block;padding:7px 9px 3px;font-size:11px;font-weight:500;color:#d9ccdc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tab-menu>span{display:block;padding:6px 9px 4px;font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:#8f879a}
