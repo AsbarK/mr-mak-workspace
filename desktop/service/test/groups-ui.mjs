@@ -56,7 +56,29 @@ try {
   // Right-click: move an ungrouped tab into an existing group, then into a new one, then ungroup from the chip.
   await tab('Animator').click({ button: 'right' });
   await page.locator('.tab-menu').waitFor();
-  assert.deepEqual(await page.locator('.tab-menu [role=menuitem]').allTextContents(), ['Dungeon', 'ThugLife', 'Close tab · keep in History'], 'groups are offered most recently active first');
+  assert.deepEqual(await page.locator('.tab-menu [role=menuitem]').allTextContents(), ['Rename chat', 'Pin in History', 'Dungeon', 'ThugLife', 'Show working folder', 'Clear terminal scrollback', 'Close tab · keep in History'], 'the tab menu keeps the chat settings and offers groups most recently active first');
+  await page.locator('.tab-menu [aria-label="Rose tab color"]').click();
+  await page.locator('.chat-tab.has-color').filter({ hasText: 'Animator' }).waitFor();
+  assert.equal(service.sessions.get('g-2').tabColor, '#dba3bb');
+  await tab('Animator').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Pin in History' }).click();
+  await page.locator('.chat-tab').first().filter({ hasText: 'Animator' }).waitFor();
+  assert.equal(service.sessions.get('g-2').pinned, true, 'pinning from the menu moves the tab ahead');
+  await tab('Animator').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Unpin from History' }).click();
+  await page.locator('.chat-tab').last().filter({ hasText: 'Animator' }).waitFor();
+  assert.equal(service.sessions.get('g-2').pinned, false, 'unpinning returns the tab to the end of the unpinned tabs');
+  await tab('Animator').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Rename chat' }).click();
+  await page.locator('.tab-menu-rename input').fill('Animator Lead');
+  await page.locator('.tab-menu-rename input').press('Enter');
+  await tab('Animator Lead').waitFor();
+  await tab('Animator Lead').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Rename chat' }).click();
+  await page.locator('.tab-menu-rename input').fill('Animator');
+  await page.locator('.tab-menu-rename input').press('Enter');
+  await tab('Animator').waitFor();
+  await tab('Animator').click({ button: 'right' });
   await page.locator('.tab-menu [role=menuitem]', { hasText: 'Dungeon' }).click();
   await page.locator('.chat-tab-group[data-chat-group="Dungeon"] .chat-tab').nth(1).waitFor();
   assert.deepEqual(await groupNames('Dungeon'), ['Combat', 'Animator'], 'joining places the tab after the last member');
@@ -67,6 +89,14 @@ try {
   await chip('Research').waitFor();
   assert.deepEqual(await groupNames('Research'), ['Animator']);
   assert.deepEqual(await names(), ['Director', 'Network', 'Combat', 'Animator']);
+  await chip('Research').click({ button: 'right' });
+  await page.locator('.tab-menu [aria-label="Sky group color"]').click();
+  await page.waitForFunction(() => document.querySelector('.chat-tab-group[data-chat-group="Research"]')?.style.getPropertyValue('--tab-accent') === '#91b6da');
+  assert.deepEqual((await (await fetch(service.origin + '/api/bootstrap', { headers: { Authorization: `Bearer ${service.token}` } })).json()).settings.groupColors, { Research: '#91b6da' });
+  await chip('Research').click({ button: 'right' });
+  assert.equal(await page.locator('.tab-menu [aria-label="Sky group color"]').getAttribute('aria-pressed'), 'true');
+  await page.locator('.tab-menu [aria-label="No group color"]').click();
+  await page.waitForFunction(() => document.querySelector('.chat-tab-group[data-chat-group="Research"]')?.style.getPropertyValue('--tab-accent') !== '#91b6da');
   await chip('Research').click({ button: 'right' });
   await page.locator('.tab-menu [role=menuitem]', { hasText: 'Ungroup 1 tab' }).click();
   await chip('Research').waitFor({ state: 'detached' });
@@ -104,7 +134,7 @@ try {
   assert.equal(await page.locator('.desktop-error').count(), 0);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(repo, 'groups.png') });
-  console.log(`Groups UI passed: chips, collapse across reload, right-click moves, new group, ungroup, drop on chip, New chat picker and options picker. Screenshot: ${path.join(repo, 'groups.png')}`);
+  console.log(`Groups UI passed: chips, collapse across reload, tab menu with rename, pin, tab color and groups, group color from the chip menu, new group, ungroup, drop on chip, New chat picker and options picker. Screenshot: ${path.join(repo, 'groups.png')}`);
 } finally {
   await browser?.close(); await service?.close();
 }

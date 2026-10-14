@@ -93,5 +93,8 @@ test('groups persist across restart and the HTTP routes validate group input', a
     assert.equal((await cleared.json()).group, null);
     const settings = await (await request('/settings', { collapsedGroups: ['Dungeon', 7, 'x'.repeat(61), 'Dungeon'] }, 'POST')).json();
     assert.deepEqual(settings.collapsedGroups, ['Dungeon']);
+    const colors = await (await request('/settings', { groupColors: { Dungeon: '#91B6DA', Bad: 'red', ['x'.repeat(61)]: '#000000', Odd: 7 } }, 'POST')).json();
+    assert.deepEqual(colors.groupColors, { Dungeon: '#91b6da' });
+    assert.deepEqual((await (await request('/settings', { groupColors: {} }, 'POST')).json()).groupColors, {});
   } finally { await service.close(); }
 });

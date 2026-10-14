@@ -40,7 +40,8 @@ Drag chat tabs to reorder them. Pinned tabs stay ahead of ordinary tabs, and can
 be reordered among themselves. Group tabs by project: choose a group in New chat,
 or right-click a tab to add it to an existing group or start a new one. Grouped
 tabs sit together behind a header chip; click the chip to collapse or expand the
-group, and drop a tab on a chip to move it there. Use History to find and pin
+group, right-click it to choose the group's color, and drop a tab on a chip to
+move it there. A tab's right-click menu also holds rename, pin, tab color and close. Use History to find and pin
 conversations you want to return to. Closing a tab and deleting a project's files are separate
 actions. Conversation recovery also depends on the selected CLI's native history.
 

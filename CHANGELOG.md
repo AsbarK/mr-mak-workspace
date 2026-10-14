@@ -5,8 +5,11 @@
 - Group chat tabs. Choose a group when opening a chat, or right-click a tab to
   add it to an existing group or start a new one. Grouped tabs sit together
   behind a header chip that collapses, shows the tab count and marks unread
-  results; dropping a tab onto a chip moves it into that group. Groups are kept
-  with History and survive restarts.
+  results; dropping a tab onto a chip moves it into that group. Right-click a
+  chip to pick the group's color. Groups are kept with History and survive
+  restarts.
+- Right-click any chat tab for its settings: rename, pin, tab color, group,
+  working folder, scrollback and close. Right-click elsewhere is unchanged.
 
 ## 0.5.1 - 2026-10-14
 

@@ -13,9 +13,9 @@ function hash(text: string) {
   return value
 }
 
-/** A stable swatch for a group name, so a group keeps its color across restarts without storing one. */
-export function groupColor(name: string) {
-  return tabColors[hash(name.trim().toLowerCase()) % tabColors.length].value
+/** The chosen color for a group, otherwise a stable swatch from its name so a group keeps its color without storing one. */
+export function groupColor(name: string, colors?: Record<string, string>) {
+  return colors?.[name] || tabColors[hash(name.trim().toLowerCase()) % tabColors.length].value
 }
 
 /**
@@ -50,7 +50,7 @@ export interface TabGroup {
 }
 
 /** Open tabs in display order, with consecutive members of one group folded together. An ungrouped tab is a one-item group without a name. */
-export function groupedChats(sessions: ChatSession[]): TabGroup[] {
+export function groupedChats(sessions: ChatSession[], colors?: Record<string, string>): TabGroup[] {
   const result: TabGroup[] = []
   for (const item of orderedChats(sessions)) {
     const working = item.status === 'running' && item.activity === 'working'
@@ -61,7 +61,7 @@ export function groupedChats(sessions: ChatSession[]): TabGroup[] {
       last.working = last.working || working
       continue
     }
-    result.push({ name: item.group || null, pinned: item.pinned, items: [item], unread: !!item.unread, working, color: item.group ? groupColor(item.group) : '#dfa3b8' })
+    result.push({ name: item.group || null, pinned: item.pinned, items: [item], unread: !!item.unread, working, color: item.group ? groupColor(item.group, colors) : '#dfa3b8' })
   }
   return result
 }
