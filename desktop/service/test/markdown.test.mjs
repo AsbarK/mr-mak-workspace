@@ -37,7 +37,8 @@ test('Main folders expose local Claude and Codex skills alongside knowledge and 
 
 test('Files preview Mac media and find decomposed (NFD) names with typed queries', async () => {
   const repo = await mkdtemp(path.resolve('.cache/files-media-'));
-  for (const name of ['voice.m4a', 'clip.m4v', 'Screen Recording.mov', 'photo.heic']) await writeFile(path.join(repo, name), '');
+  // Empty files preview as text, so give the media files binary content.
+  for (const name of ['voice.m4a', 'clip.m4v', 'Screen Recording.mov', 'photo.heic']) await writeFile(path.join(repo, name), Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]));
   const files = new Files(repo);
   assert.equal((await files.preview(path.join(repo, 'voice.m4a'))).kind, 'audio');
   assert.equal((await files.preview(path.join(repo, 'clip.m4v'))).kind, 'video');

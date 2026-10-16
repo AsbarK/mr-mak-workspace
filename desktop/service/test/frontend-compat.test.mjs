@@ -17,7 +17,10 @@ test('anySignal combines signals without AbortSignal.any (WebKit < 17.4)', async
     const done = new AbortController(); done.abort('already');
     assert.equal(anySignal([new AbortController().signal, done.signal]).reason, 'already');
     const timed = anySignal([new AbortController().signal, AbortSignal.timeout(10)]);
-    await new Promise(resolve => timed.addEventListener('abort', resolve, { once: true }));
+    // AbortSignal.timeout does not keep the event loop alive, so hold it open.
+    const keepAlive = setTimeout(() => {}, 5000);
+    try { await new Promise(resolve => timed.addEventListener('abort', resolve, { once: true })); }
+    finally { clearTimeout(keepAlive); }
     assert.equal(timed.reason.name, 'TimeoutError');
   } finally { AbortSignal.any = native; }
   const native2 = anySignal([AbortSignal.abort('x')]);
