@@ -17,7 +17,9 @@ delete a group that only closed chats still carry. Collapsed groups are
 remembered per installation. The Win-key shortcut is
 optional: when enabled, a single Win press returns to hidden Mr. Mak windows;
 when they are already in view, it opens Start. Win combinations remain normal.
-The template leaves it disabled.
+On macOS, the same option is under Settings > Shortcut: its key combination
+brings back the windows from any app, and clicking the Dock icon also restores
+them. The template leaves it disabled.
 
 Choose chat permission bypass deliberately. Ordinary permissions are the default.
 Voice settings can adjust the voice profile, speed and conversation behavior.
