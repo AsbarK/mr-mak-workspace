@@ -580,8 +580,7 @@ try {
   assert.deepEqual(writes.slice(beforeKeys), ['\x1b[D', '\x1b[A', '\x1b[B', '\x1b[C'].map(data => ({ id: ids[1], data })));
   for (const width of [320, 390]) {
     await phone.setViewportSize({ width, height: 844 });
-    // The terminal refits in a ResizeObserver callback after the resize resolves.
-    await expect.poll(() => phone.locator('.mobile-terminal-viewport').evaluate(node => node.scrollWidth - node.clientWidth), { message: `Fitted terminal needs no horizontal scrolling at ${width}px` }).toBeLessThanOrEqual(1);
+    await expect.poll(() => phone.locator('.mobile-terminal-reader').evaluate(node => node.scrollWidth - node.clientWidth), { message: `Wrapped terminal needs no horizontal scrolling at ${width}px` }).toBeLessThanOrEqual(1);
     const keyLayout = await phone.locator('.mobile-terminal-keys').evaluate(node => ({ client: node.clientWidth, scroll: node.scrollWidth, keys: [...node.querySelectorAll('button')].map(button => { const r = button.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: r.width, height: r.height }; }) }));
     assert.ok(keyLayout.scroll <= keyLayout.client + 1);
     assert.equal(new Set(keyLayout.keys.map(r => r.top)).size, 1, 'Terminal controls occupy one row');
@@ -599,6 +598,11 @@ try {
   await phone.getByRole('button', { name: 'Show terminal at actual size' }).click();
   assert.equal(await phone.locator('.mobile-terminal-surface').evaluate(node => getComputedStyle(node).transform), 'matrix(1, 0, 0, 1, 0, 0)');
   await phone.getByRole('button', { name: 'Fit terminal to screen' }).click();
+  for (const width of [320, 390]) {
+    await phone.setViewportSize({ width, height: 844 });
+    // Fit is applied by ResizeObserver, after the viewport change resolves.
+    await expect.poll(() => phone.locator('.mobile-terminal-viewport').evaluate(node => node.scrollWidth - node.clientWidth), { message: `Fitted terminal needs no horizontal scrolling at ${width}px` }).toBeLessThanOrEqual(1);
+  }
   assert.deepEqual(ids.map(id => ({ cols: service.sessions.get(id).cols, rows: service.sessions.get(id).rows })), dimensions);
   await phone.getByRole('button', { name: 'Conversation', exact: true }).click();
   await phone.locator('input[type=file]').setInputFiles({ name: 'phone.png', mimeType: 'image/png', buffer: png });

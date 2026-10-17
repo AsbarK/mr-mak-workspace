@@ -136,7 +136,7 @@ test('terminal permission menus are read from the bottom of the screen only', ()
 test('answering a prompt re-checks it and moves the selection one key at a time', async () => {
   const writes = [];
   let screen = claudeScreen;
-  const sessions = { read: async () => ({ screen }), input: (_id, data) => {
+  const sessions = { read: async () => ({ screen }), keys: (_id, data) => {
     writes.push(data);
     if (data === '\x1b[B') {
       const selected = terminalPrompt(screen).selected;

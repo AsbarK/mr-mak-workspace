@@ -83,11 +83,10 @@ same agent and settings. The new chat starts by reading that handoff. Choose
 
 ![The fresh-chat offer in a long conversation, with Summarize and continue, Later and Not for this chat](docs/assets/handoff-offer.png)
 
-The folder button next to **+** groups open chat tabs by project, and tab
-shortcuts follow the grouped order. Click a project label to collapse its tabs;
-the open chat stays visible. Double-click a tab, or press F2, to rename its chat.
-
-![Chat tabs grouped under three projects: dream-game, arachne-lab and mr-mak](docs/assets/tabs-by-project.png)
+Choose a group in **New chat**, or right-click a tab to create or join one.
+Group headers can be dragged, collapsed, renamed and coloured. Deleting a group
+keeps its chats, including those in History. Pinned tabs stay ahead of other
+tabs. Double-click a tab, or press F2, to rename its chat.
 
 ## On your phone
 

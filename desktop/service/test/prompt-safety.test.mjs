@@ -5,7 +5,7 @@ import { answerPrompt, readPrompt, terminalPrompt } from '../terminal-prompt.mjs
 function fixture() {
   const state = { command: 'echo first', selected: 0, visible: true, process: {}, writes: [], afterKey: null };
   const screen = () => state.visible ? ['Allow command?', `$ ${state.command}`, '', ...['Yes, proceed', 'Yes, always', 'No'].map((label, i) => `${i === state.selected ? '>' : ' '} ${i + 1}. ${label}`), 'Press enter to confirm'].join('\n') : 'Working...';
-  const sessions = { get: () => ({ process: state.process }), read: async () => ({ screen: screen() }), input: (_, data) => {
+  const sessions = { get: () => ({ process: state.process }), read: async () => ({ screen: screen() }), keys: (_, data) => {
     state.writes.push(data);
     if (data === '\x1b[B') state.selected++;
     if (data === '\x1b[A') state.selected--;

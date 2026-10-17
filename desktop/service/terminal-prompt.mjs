@@ -79,14 +79,14 @@ export async function answerPrompt(sessions, id, promptId, choice) {
     };
     let prompt = await current();
     if (choice === 'cancel') {
-      state.prompts.get(id).used = true; sessions.input(id, '\x1b');
+      state.prompts.get(id).used = true; sessions.keys(id, '\x1b');
       return { delivered: true, choice };
     }
     if (!Number.isInteger(choice) || choice < 0 || choice >= prompt.options.length) throw new Error('Choose one of the listed options.');
     for (let moves = 0; prompt.selected !== choice; moves++) {
       if (moves >= prompt.options.length) throw conflict();
       const previous = prompt.selected;
-      sessions.input(id, choice > previous ? '\x1b[B' : '\x1b[A');
+      sessions.keys(id, choice > previous ? '\x1b[B' : '\x1b[A');
       const deadline = Date.now() + 1000;
       do { await keyDelay(60); prompt = await current(); } while (prompt.selected === previous && Date.now() < deadline);
       if (prompt.selected === previous) throw conflict();
@@ -95,7 +95,7 @@ export async function answerPrompt(sessions, id, promptId, choice) {
     await keyDelay(60); prompt = await current();
     if (prompt.selected !== choice) throw conflict();
     state.prompts.get(id).used = true;
-    sessions.input(id, '\r');
+    sessions.keys(id, '\r');
     return { delivered: true, choice, option: prompt.options[choice] };
   } finally { state.answering.delete(id); }
 }

@@ -79,6 +79,13 @@ try {
   await page.locator('.tab-menu-rename input').fill('Animator');
   await page.locator('.tab-menu-rename input').press('Enter');
   await tab('Animator').waitFor();
+  await tab('Animator').getByRole('tab').press('F2');
+  await page.getByRole('textbox', { name: 'English chat name' }).fill('Animation Review');
+  await page.getByRole('textbox', { name: 'English chat name' }).press('Enter');
+  await tab('Animation Review').getByRole('tab').dblclick();
+  await page.getByRole('textbox', { name: 'English chat name' }).fill('Animator');
+  await page.getByRole('textbox', { name: 'English chat name' }).press('Enter');
+  await tab('Animator').waitFor();
   await tab('Animator').click({ button: 'right' });
   await page.locator('.tab-menu [role=menuitem]', { hasText: 'Dungeon' }).click();
   await page.locator('.chat-tab-group[data-chat-group="Dungeon"] .chat-tab').nth(1).waitFor();

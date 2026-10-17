@@ -1,58 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.5.2 - 2026-10-18
 
-- Group chat tabs. Choose a group when opening a chat, or right-click a tab to
-  add it to an existing group or start a new one. Grouped tabs sit together
-  behind a header chip that collapses, shows the tab count and marks unread
-  results; dropping a tab onto a chip moves it into that group. Drag a chip to
-  move the whole group. Right-click a chip to rename the group, which merges it
-  into another group of that name, to pick its color, or to delete the group;
-  History's group filters find a group that only closed chats still carry and
-  delete it from there. Deleting ungroups the chats and keeps them. Groups are
-  kept with History and survive restarts.
-- Right-click any chat tab for its settings: rename, pin, tab color, group,
-  working folder, scrollback and close. Right-click elsewhere is unchanged.
-- Document each setup path for macOS next to the Windows one: the Apple Silicon `.dmg` in Releases, Open Anyway and quarantine removal for a downloaded copy, `./setup.sh preview`, macOS update steps, Python 3.12 (`python3.12`) for local dictation and Read aloud, Playwright WebKit for the UI tests, and macOS/Linux virtual environment commands for the video-watch and fal.ai helpers.
-- Describe macOS behavior in the in-app Help, the Make Workspace Yours card and the voice coordinator's guide: ⌘C/⌘V copy and paste while Ctrl+C reaches the CLI, Finder and the Trash, the Settings recall shortcut and the Option key.
-- Change the macOS recall shortcut to ⌃⌥⌘Space. ⌃⌥Space is macOS's "Select next source in Input menu"; an enabled shortcut moves to the new chord automatically.
-- macOS terminals: Option types the keyboard layout's characters (@, {, | and so on) by default; Settings > Chats can turn Option into a Meta key. OSC 52 copies now reach the clipboard in WKWebView.
-- macOS app: ad-hoc signed and sealed builds (CI verifies the signature), login-shell import of CLI config folders and the locale, Move to Trash without a Finder Automation prompt, downloads saved to `~/Downloads`, Show in Finder selects packages, correct drop positions on Retina displays, a template menu-bar icon, system light/dark title bars, minimized windows counted as open for recall, and a startup error dialog instead of a crash.
-- Files rail: ⌘⌫ moves to the Trash on macOS, backslashes stay part of macOS file names, accented names match typed searches, `~` expands in path boxes and new-chat folders, and `.m4a`/`.m4v` (plus `.mov`/`.heic` on macOS) preview with a fallback card when the webview cannot play them.
-- Service: chats save the folder's real path, so History finds Codex and Claude transcripts through symlinks, `/tmp` and accented folder names; stopping a chat also ends its grandchildren; command lookup ignores folders, non-executables and relative PATH entries; the macOS Shell tab is a login shell with a UTF-8 locale; Godot is found in Applications.
-- Setup: `./setup.sh check` reports the Xcode Command Line Tools, the build bundles only a self-contained Node and raises the macOS minimum to what it needs, `skills:pack` finds `python3` or `python`, local voice setup on macOS switches to an installed Python 3.10–3.12 and handles missing python.org certificates, `Start Mr. Mak.command` warns about an older installed app, and the `public/workspace` link repairs itself after a move.
-- Fix WebKit timing in the mobile report-position restore and the mobile terminal fit test, and support WebKit before 17.4 without `AbortSignal.any`.
-- New chat lists recent projects: folders opened in Claude Code plus folders of earlier Mr. Mak chats. Choose one instead of typing a path; the folder field stays editable. Paired phones can start a chat in a listed project, never in an arbitrary path.
-- Add a Conversation view for Claude Code and Codex desktop chats, next to Terminal. It shows the native transcript as messages with Markdown, images, recent tool activity and a composer with attachments and dictation.
-- Answer CLI permission menus from the Conversation view. The numbered menu at the bottom of the terminal is shown as buttons; the answer is checked against the current screen before any key is sent.
-- Recent projects also include folders where Codex ran. Pin favorite projects to the top of the list. History can filter by project.
-- Mr. Mak voice can list projects and open a chat in the one you name.
-- Links to local files in Conversation messages open a Workspace preview; folder links open the folder.
-- Read aloud on desktop, with the same local voices as the phone.
-- Offer a fresh chat when a Claude Code or Codex chat passes a set number of your messages (chat options; 40 by default, or Off). Accepting asks the agent for a handoff, saves it in `inbox/handoffs` and opens a new chat in the same project that starts by reading it. Dismiss for later or for that chat.
-- The phone's Terminal view opens in Wrap mode: the live terminal text wraps to the screen and can be selected. Fit and Actual remain available.
-- Phone and desktop Conversation views no longer show Claude Code's `<pasted_content>` tags around messages sent from Mr. Mak.
-- Group open tabs by project with the folder button next to New chat. Tab shortcuts follow the grouped order. When the tab bar wraps, a project label stays on the row of its first tab. Click a project label to collapse its tabs; collapsed projects line up on one row and keep the open chat visible.
-- Rename a chat from its tab: double-click it or press F2, then Enter to save or Escape to cancel.
-- Autocomplete commands in the Conversation view. Type `/` at the start of a message, or `$` before a word in a Codex chat, to list that CLI's built-in commands plus project, user and plugin commands and skills. A command that opens a picker, such as `/model`, switches the chat to Terminal.
-- Conversation views show what the CLI adds to a chat as compact events instead of raw tags: background agent results (a review's findings become a list with file links), slash commands and their output, and relays. Choose Compact, Expanded or Hidden in chat options. These events no longer count toward the fresh-chat suggestion.
-- The desktop status bar shows the model the chat last used, next to reasoning effort and permissions.
-- Conversation views read Codex 0.163 chats, which record messages as completed items: your messages and replies show as before, Codex's injected project instructions and environment no longer appear as your messages, and tool activity includes its custom tool calls. Codex command autocomplete matches 0.163 (`/approvals` is now `/permissions`; `/plan`, `/skills`, `/rename`, `/goal` and others added).
-- Codex chats stay linked to their conversation with Codex 0.163's shared background server: Mr. Mak starts Codex with `--no-daemon` when the installed version offers it. Without it, chats that did not bypass permissions were never matched to their rollout, so the Conversation view, model and turn notifications stayed empty.
-- A Codex chat follows a rewind made in its terminal (Esc Esc), which continues the thread in a new rollout file, and a new thread started there with `/new`. The Conversation view joins the rewound history with the new messages.
-- Edit a sent message in a Claude Code chat's Conversation view, as with Esc Esc in Claude Code. The pencil on your message opens an editor; sending rewinds the conversation to before that message (files are not changed) and sends the edited text. Conversation views show only the current branch after a rewind, including one made in the terminal.
-- Phone: pull down from the top of the Workspace to refresh it, as in a mobile browser. The report list reloads, and an open report reloads at the same page and section. The browser's own pull no longer reloads the whole app there.
-- Phone: the back gesture returns to the previous screen instead of leaving the app: a chat or the Workspace to the chat list, an open report to the Workspace list and History to the open chats. On the chat list it leaves the app as before. It uses the browser's close request (CloseWatcher), available in Chrome and Edge on Android.
-- Conversation views on desktop and phone show, above the composer, the subagents and background terminal commands a Claude Code chat started that are still working, including those that keep going while the chat waits. Expand the line to see each agent's task and current step (for example `Bash · Run the tests`), each command and the agent that started it, and how long each has been running.
-- Local Whisper dictation keeps accented letters. On Windows the transcript reached the service in the console code page and every accent became `�`, so Portuguese and other languages came out garbled.
-- Start a restarted chat on a clean terminal. A chat keeps its terminal when
-  its CLI restarts, so a fullscreen CLI that was stopped without restoring the
-  screen left its alternate screen and mouse capture behind for the next
-  process: no scrollback, and the wheel arrived as mouse reports. The service
-  now clears those modes before every launch, in its own terminal and in every
-  attached renderer, and asks Claude to exit with Ctrl+C before the hard stop,
-  as it already did for OpenCode, so Claude's fullscreen renderer no longer
-  counts a closed tab as a failed start.
+- Group chat tabs with named, coloured headers. Drag or collapse a group, manage it from a tab's right-click menu, and find groups in History. Deleting a group keeps its chats. Pinned tabs retain their separate order.
+- Add an optional Conversation view for Claude Code and Codex, with Markdown, images, attachments, dictation, local file previews, read aloud and command completion. Terminal remains available for native CLI controls. Double-click or press F2 to rename a tab.
+- Answer CLI menus in Conversation with one-use approvals bound to the current process and full visible prompt. Changed commands, repeated submissions and changes during menu navigation are rejected.
+- Edit sent Claude messages through its native rewind. Full message labels must match exactly; ambiguous shortened labels require choosing in the terminal.
+- List recent projects in New chat, pin favourite folders and filter History by project. Paired phones can select listed folders. Optional fresh-chat suggestions save a handoff and continue with the same agent and permission settings.
+- Read Codex 0.163 completed-item transcripts and follow native rewinds or `/new`. Use `--no-daemon` when supported so each terminal stays linked to its conversation. Show the active model and compact CLI/background-agent events.
+- Mobile Terminal defaults to wrapping text, with Fit and Actual modes available. Add Workspace pull-to-refresh and Android Chrome/Edge back navigation. Preserve report positions without replaying a stale restore on fragment navigation.
+- Improve macOS keyboard layouts, Option/Meta settings, clipboard, Retina drag/drop, downloads, Finder/Trash operations, recall shortcuts, CLI paths and process cleanup. Validate bundled Node and ad-hoc app signatures. Developer ID signing and notarization are not included.
+- Improve macOS setup documentation and local voice installation. Preserve accented Whisper transcripts on Windows.
+- Reset alternate-screen and mouse-capture modes before restarting a CLI; let Claude exit gracefully before the bounded hard-stop fallback.
+- Accept quoted Windows installation paths when updating.
+- Update five official GitHub Actions at verified commit pins. Keep release dependency jobs read-only, without persisted checkout credentials or automatic npm caching.
 
 ## 0.5.1 - 2026-10-14
 
