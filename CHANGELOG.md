@@ -45,6 +45,14 @@
 - Phone: the back gesture returns to the previous screen instead of leaving the app: a chat or the Workspace to the chat list, an open report to the Workspace list and History to the open chats. On the chat list it leaves the app as before. It uses the browser's close request (CloseWatcher), available in Chrome and Edge on Android.
 - Conversation views on desktop and phone show, above the composer, the subagents and background terminal commands a Claude Code chat started that are still working, including those that keep going while the chat waits. Expand the line to see each agent's task and current step (for example `Bash · Run the tests`), each command and the agent that started it, and how long each has been running.
 - Local Whisper dictation keeps accented letters. On Windows the transcript reached the service in the console code page and every accent became `�`, so Portuguese and other languages came out garbled.
+- Start a restarted chat on a clean terminal. A chat keeps its terminal when
+  its CLI restarts, so a fullscreen CLI that was stopped without restoring the
+  screen left its alternate screen and mouse capture behind for the next
+  process: no scrollback, and the wheel arrived as mouse reports. The service
+  now clears those modes before every launch, in its own terminal and in every
+  attached renderer, and asks Claude to exit with Ctrl+C before the hard stop,
+  as it already did for OpenCode, so Claude's fullscreen renderer no longer
+  counts a closed tab as a failed start.
 
 ## 0.5.1 - 2026-10-14
 
