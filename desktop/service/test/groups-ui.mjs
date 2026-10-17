@@ -11,8 +11,9 @@ import { launchBrowser } from './browser.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 await mkdir(path.join(root, '.cache'), { recursive: true });
 const repo = await mkdtemp(path.join(root, '.cache/groups-ui-'));
-const chats = [['g-0', 'Director', 'ThugLife'], ['g-1', 'Network', 'ThugLife'], ['g-2', 'Animator', null], ['g-3', 'Combat', 'Dungeon']].map(([id, name, group], tabOrder) => ({
-  id, name, group, tabOrder, agent: 'codex', cwd: repo, nativeId: null, hasConversation: false, open: true, pinned: false, status: 'stopped', createdAt: '2026-10-14T08:00:00Z', updatedAt: `2026-10-14T08:0${tabOrder}:00Z`, cols: 80, rows: 24,
+// g-4 is a closed chat: it keeps its group in History and has no tab.
+const chats = [['g-0', 'Director', 'ThugLife', true], ['g-1', 'Network', 'ThugLife', true], ['g-2', 'Animator', null, true], ['g-3', 'Combat', 'Dungeon', true], ['g-4', 'Scout', 'Dungeon', false]].map(([id, name, group, open], tabOrder) => ({
+  id, name, group, tabOrder, agent: 'codex', cwd: repo, nativeId: null, hasConversation: false, open, pinned: false, status: 'stopped', createdAt: '2026-10-14T08:00:00Z', updatedAt: `2026-10-14T08:0${tabOrder}:00Z`, cols: 80, rows: 24,
 }));
 await mkdir(path.join(repo, 'workspace'));
 await writeFile(path.join(repo, 'workspace/workspace.json'), '{"entities":[]}');
@@ -156,10 +157,34 @@ try {
   await page.waitForFunction(() => document.querySelector('.chat-group-chip .chip-name')?.textContent === 'Dungeon');
   assert.deepEqual(await page.locator('.chat-group-chip .chip-name').allTextContents(), ['Dungeon', 'Studio']);
   assert.equal(await page.locator('.chat-tab-group.collapsed').count(), 0);
+
+  // Right-click a chip to delete the group: the open tab and the History chat lose it, both chats stay.
+  await chip('Dungeon').click({ button: 'right' });
+  await page.locator('.tab-menu [role=menuitem]', { hasText: 'Delete group…' }).click();
+  assert.match(await page.locator('.tab-menu-confirm p').textContent(), /1 open tab and 1 chat in History/);
+  await page.locator('.tab-menu-confirm button.danger').click();
+  await chip('Dungeon').waitFor({ state: 'detached' });
+  assert.equal(service.sessions.get('g-3').group, null);
+  assert.equal(service.sessions.get('g-4').group, null);
+  assert.ok((await names()).includes('Combat'), 'the chat stays open');
+
+  // History lists every group as a filter, including one that only a closed chat still carries, and deletes it from there.
+  await service.sessions.assign('g-4', 'Archive');
+  await page.locator('.history-button').click();
+  await page.locator('.history-filters button', { hasText: 'Archive' }).click();
+  assert.match(await page.locator('.history-group-bar').textContent(), /Archive · 0 open · 1 in History/);
+  assert.deepEqual(await page.locator('.history-item strong').allTextContents(), ['Scout']);
+  await page.locator('.history-group-bar button', { hasText: 'Delete group…' }).click();
+  await page.locator('.history-group-bar button.danger').click();
+  await page.locator('.history-filters button', { hasText: 'Archive' }).waitFor({ state: 'detached' });
+  assert.equal(service.sessions.get('g-4').group, null);
+  assert.equal(await page.locator('.history-filters button.selected').textContent(), 'All');
+  await page.locator('.history-button').click();
+
   assert.equal(await page.locator('.desktop-error').count(), 0);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(repo, 'groups.png') });
-  console.log(`Groups UI passed: chips, collapse across reload, tab menu with rename, pin, tab color and groups, group color from the chip menu, new group, ungroup, drop on chip, New chat picker, options picker, group rename and group drag. Screenshot: ${path.join(repo, 'groups.png')}`);
+  console.log(`Groups UI passed: chips, collapse across reload, tab menu with rename, pin, tab color and groups, group color from the chip menu, new group, ungroup, drop on chip, New chat picker, options picker, group rename, group drag, delete from the chip and from History. Screenshot: ${path.join(repo, 'groups.png')}`);
 } finally {
   await browser?.close(); await service?.close();
 }

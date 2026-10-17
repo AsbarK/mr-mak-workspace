@@ -286,6 +286,16 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
           }
           return json(response, 200, result);
         }
+        if (method === 'POST' && url.pathname === '/api/groups/delete') {
+          // The group's color and collapsed state go with it; the chats stay.
+          const name = groupLabel(data.name);
+          const result = await sessions.deleteGroup(name);
+          const colors = { ...(settings.groupColors || {}) }; delete colors[name];
+          settings.groupColors = colors;
+          settings.collapsedGroups = (settings.collapsedGroups || []).filter(item => item !== name);
+          await saveSettings(); broadcast('settings', { settings });
+          return json(response, 200, result);
+        }
         const sessionRoute = /^\/api\/sessions\/([\w-]+)(?:\/(\w+))?$/.exec(url.pathname);
         if (sessionRoute) {
           const [, id, action] = sessionRoute;

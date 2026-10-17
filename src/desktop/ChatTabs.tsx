@@ -18,8 +18,8 @@ function Swatches({ label, value, onChange }: { label: string; value: string | n
   </div>
 }
 
-export default function ChatTabs({ items, selectedId, agents, groups, collapsed, groupColors, choose, close, toggleGroup, collapseOthers, setGroupColor }: {
-  items: ChatSession[]; selectedId?: string; agents: AgentInfo[]; groups: string[]; collapsed: string[]; groupColors: Record<string, string>
+export default function ChatTabs({ items, selectedId, agents, groups, collapsed, groupColors, historyCounts, choose, close, toggleGroup, collapseOthers, setGroupColor }: {
+  items: ChatSession[]; selectedId?: string; agents: AgentInfo[]; groups: string[]; collapsed: string[]; groupColors: Record<string, string>; historyCounts: Record<string, number>
   choose: (id: string) => void; close: (id: string) => void; toggleGroup: (name: string) => void; collapseOthers: (name: string) => void; setGroupColor: (name: string, value: string | null) => void
 }) {
   const gesture = useRef<Drag | null>(null)
@@ -30,6 +30,7 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
   const [menu, setMenu] = useState<Menu | null>(null)
   const [draft, setDraft] = useState('')
   const [rename, setRename] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState(false)
   const clear = () => { gesture.current = null; drop.current = null; setDragging(null); setTarget(null) }
   const clearRef = useRef(clear)
   useEffect(() => { clearRef.current = clear })
@@ -48,10 +49,11 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
     return () => { window.removeEventListener('pointerdown', dismiss); window.removeEventListener('keydown', escape); window.removeEventListener('resize', dismiss) }
   }, [menu])
   const grouped = groupedChats(items, groupColors)
-  const openMenu = (event: React.MouseEvent, value: Menu) => { event.preventDefault(); event.stopPropagation(); setDraft(''); setRename(null); setMenu(value) }
+  const openMenu = (event: React.MouseEvent, value: Menu) => { event.preventDefault(); event.stopPropagation(); setDraft(''); setRename(null); setConfirm(false); setMenu(value) }
   const patch = (id: string, data: object) => { setMenu(null); api(`/sessions/${id}`, data, 'PATCH').catch(reportError) }
   const ungroup = (group: TabGroup) => { setMenu(null); Promise.all(group.items.map(item => api(`/sessions/${item.id}`, { group: null }, 'PATCH'))).catch(reportError) }
   const renameGroup = (from: string, to: string) => { setMenu(null); setRename(null); if (to !== from) api('/groups/rename', { from, to }).catch(reportError) }
+  const deleteGroup = (name: string) => { setMenu(null); setConfirm(false); api('/groups/delete', { name }).catch(reportError) }
   function begin(event: React.PointerEvent<HTMLButtonElement>, item: ChatSession, group?: string) {
     if (event.button !== 0) return
     suppressClick.current = false
@@ -157,6 +159,11 @@ export default function ChatTabs({ items, selectedId, agents, groups, collapsed,
         <Swatches label="Group color" value={groupColors[menu.group.name!] || null} onChange={value => { setMenu(null); setGroupColor(menu.group.name!, value) }} />
         <hr />
         <button type="button" role="menuitem" onClick={() => ungroup(menu.group)}>Ungroup {menu.group.items.length} {menu.group.items.length === 1 ? 'tab' : 'tabs'}</button>
+        {confirm ? (() => {
+          // Ungroup only reaches the open tabs; deleting also clears the group from History chats and forgets its color.
+          const history = historyCounts[menu.group.name!] || 0
+          return <div className="tab-menu-confirm"><p>Remove the {menu.group.name} group from {menu.group.items.length} open {menu.group.items.length === 1 ? 'tab' : 'tabs'}{history ? ` and ${history} ${history === 1 ? 'chat' : 'chats'} in History` : ''}. The chats stay where they are.</p><button type="button" className="danger" onClick={() => deleteGroup(menu.group.name!)}>Delete group</button><button type="button" onClick={() => setConfirm(false)}>Cancel</button></div>
+        })() : <button type="button" role="menuitem" className="danger" onClick={() => setConfirm(true)}>Delete group…</button>}
       </>}
     </div>}
   </div>

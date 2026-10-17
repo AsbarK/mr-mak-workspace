@@ -66,6 +66,17 @@ export function groupedChats(sessions: ChatSession[], colors?: Record<string, st
   return result
 }
 
+/** How many open tabs and History chats carry each group, for the confirmations that delete one. */
+export function groupCounts(sessions: ChatSession[]) {
+  const counts: Record<string, { open: number; history: number }> = {}
+  for (const item of sessions) {
+    if (!item.group) continue
+    counts[item.group] ??= { open: 0, history: 0 }
+    counts[item.group][item.open ? 'open' : 'history']++
+  }
+  return counts
+}
+
 /** Known group names, most recently used first. Closed chats count, so a group that lives in History can still be chosen. */
 export function groupNames(sessions: ChatSession[]) {
   const names: string[] = []

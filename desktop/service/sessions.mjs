@@ -447,6 +447,17 @@ export class Sessions extends EventEmitter {
     }
     return this.active();
   }
+  // Deleting a group ungroups every chat that carries it, History included;
+  // the chats themselves stay. Unlike ungrouping from a chip, this also
+  // reaches a group that no open tab shows any more.
+  async deleteGroup(name) {
+    const label = groupLabel(name);
+    if (!label) throw new Error('Name the group.');
+    const members = [...this.items.values()].filter(item => item.group === label);
+    for (const session of members) { session.group = null; this.changed(session); }
+    if (members.length) await this.persist();
+    return { removed: members.length, history: members.filter(item => !item.open).length };
+  }
   async clearScreen(id) {
     const session = this.get(id); await this.hydrate(session);
     session.terminal.clear(); this.dirty = true;

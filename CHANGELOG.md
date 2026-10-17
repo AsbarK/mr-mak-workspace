@@ -7,8 +7,10 @@
   behind a header chip that collapses, shows the tab count and marks unread
   results; dropping a tab onto a chip moves it into that group. Drag a chip to
   move the whole group. Right-click a chip to rename the group, which merges it
-  into another group of that name, or to pick its color. Groups are kept with
-  History and survive restarts.
+  into another group of that name, to pick its color, or to delete the group;
+  History's group filters find a group that only closed chats still carry and
+  delete it from there. Deleting ungroups the chats and keeps them. Groups are
+  kept with History and survive restarts.
 - Right-click any chat tab for its settings: rename, pin, tab color, group,
   working folder, scrollback and close. Right-click elsewhere is unchanged.
 

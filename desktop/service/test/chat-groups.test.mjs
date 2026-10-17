@@ -94,6 +94,14 @@ test('a group moves as one block and renaming relabels it everywhere', async () 
     await assert.rejects(sessions.renameGroup('Crypt', '  '), /Name the group/);
     await assert.rejects(sessions.renameGroup('Crypt', 'Склеп'), /English group name/);
     assert.equal(sessions.get('b').group, 'Crypt', 'a refused rename changes nothing');
+
+    // Deleting a group ungroups every member, the closed one included, and keeps the tab order.
+    assert.deepEqual(await sessions.deleteGroup(' Crypt '), { removed: 5, history: 1 });
+    assert.deepEqual(['b', 'c', 'd', 'e', 'f'].map(id => sessions.get(id).group), [null, null, null, null, null]);
+    assert.deepEqual(ids(sessions), ['f', 'a', 'b', 'd', 'c'], 'leaving the group keeps every tab where it was');
+    assert.deepEqual(await sessions.deleteGroup('Crypt'), { removed: 0, history: 0 }, 'deleting again is harmless');
+    await assert.rejects(sessions.deleteGroup('Склеп'), /English group name/);
+    await assert.rejects(sessions.deleteGroup('  '), /Name the group/);
   } finally { await sessions.close(); }
 });
 
@@ -148,5 +156,19 @@ test('groups persist across restart and the HTTP routes validate group input', a
     assert.deepEqual((await moved.json()).map(item => item.id), ['f', 'c', 'a', 'b', 'd']);
     const across = await request('/groups/move', { group: 'Solo', pinned: false, targetId: 'f', position: 'after' }, 'POST');
     assert.match((await across.json()).error, /Pinned tabs stay together/);
+
+    // Deleting a group over HTTP also forgets its color and collapsed state; other groups keep theirs.
+    await request('/settings', { groupColors: { Team: '#dba3bb', Solo: '#91b6da' }, collapsedGroups: ['Team', 'Solo'] }, 'POST');
+    const deleted = await request('/groups/delete', { name: 'Team' }, 'POST');
+    assert.equal(deleted.status, 200);
+    assert.deepEqual(await deleted.json(), { removed: 5, history: 1 });
+    assert.deepEqual(['a', 'b', 'd', 'e', 'f'].map(id => service.sessions.get(id).group), [null, null, null, null, null]);
+    assert.equal(service.sessions.get('c').group, 'Solo');
+    saved = await (await fetch(service.origin + '/api/bootstrap', { headers: { Authorization: `Bearer ${service.token}` } })).json();
+    assert.deepEqual([saved.settings.groupColors, saved.settings.collapsedGroups], [{ Solo: '#91b6da' }, ['Solo']]);
+    assert.deepEqual(await (await request('/groups/delete', { name: 'Nowhere' }, 'POST')).json(), { removed: 0, history: 0 });
+    const badDelete = await request('/groups/delete', { name: 'Команда' }, 'POST');
+    assert.equal(badDelete.ok, false);
+    assert.match((await badDelete.json()).error, /English group name/);
   } finally { await service.close(); }
 });

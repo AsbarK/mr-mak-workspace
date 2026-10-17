@@ -12,8 +12,9 @@ Settings button in the top bar and saves the choice in that browser.
 
 Terminal text settings, tab colors and tab groups live with Chats. A group is a
 short English label chosen in New chat or from a tab's right-click menu, and
-renamed from its chip's right-click menu; collapsed groups are remembered per
-installation. The Win-key shortcut is
+renamed or deleted from its chip's right-click menu; History's group filters
+delete a group that only closed chats still carry. Collapsed groups are
+remembered per installation. The Win-key shortcut is
 optional: when enabled, a single Win press returns to hidden Mr. Mak windows;
 when they are already in view, it opens Start. Win combinations remain normal.
 The template leaves it disabled.
