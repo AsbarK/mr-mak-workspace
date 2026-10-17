@@ -72,4 +72,4 @@ try {
   await provider.selectOption('local'); await expect(provider).toHaveValue('local');
   await page.screenshot({ path: path.join(repo, 'desktop-dictation.png') });
   console.log(JSON.stringify({ ok: true, screenshot: path.join(repo, 'desktop-dictation.png'), checks: ['record', 'cancel', 'no extra panel', 'direct paste without Enter'] }));
-} finally { await browser?.close(); await service.close(); }
+} finally { await browser?.close(); session.process = null; await service.close(); }
