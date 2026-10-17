@@ -8,7 +8,9 @@ conversations.
 ## Application
 
 1. Finish active agent tasks, then choose Quit from Mr. Mak's tray menu.
-2. Install **Mr. Mak Workspace 0.5.1** for Windows x64.
+2. Download the latest **Mr. Mak Workspace** Windows x64 installer from
+   [Releases](https://github.com/witnesstodark/mr-mak-workspace/releases/latest)
+   and run it.
 3. Open the same repository you were using before. Your cards, settings and
    History remain in that folder.
 
@@ -45,6 +47,12 @@ from the disk image over the one in Applications and choose Replace.
 
 macOS asks again for permissions such as microphone access after each rebuild,
 because the ad-hoc signature changes. See [macOS notes](macos.md).
+
+Version 0.5.2 adds named chat groups and an optional **Conversation** view for
+Claude Code and Codex. Right-click a chat tab to manage its group, or use the
+Conversation / Terminal switch to choose how you read that chat. Existing chats
+and phone pairings remain available. It also includes macOS compatibility,
+terminal restart and Windows updater fixes. See the [changelog](../CHANGELOG.md).
 
 The 0.5.1 source update preserves your selected dictation provider, custom model
 and terminal appearance. Fresh setups default to local Whisper, which requires
