@@ -86,6 +86,7 @@ try {
   await expect(page.getByRole('button', { name: 'Terminal', exact: true })).toHaveAttribute('aria-pressed', 'true');
   assert.ok(writes.some(item => item.data.includes('/model')));
   await page.getByRole('button', { name: 'Conversation', exact: true }).click();
+  await expect(input).toHaveValue('');
   for (const width of [500, 900]) {
     await page.setViewportSize({ width, height: 760 });
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();

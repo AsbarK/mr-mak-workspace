@@ -6,6 +6,7 @@
 - Add an optional Conversation view for Claude Code and Codex, with Markdown, images, attachments, dictation, local file previews, read aloud and command completion. Terminal remains available for native CLI controls. Double-click or press F2 to rename a tab.
 - Answer CLI menus in Conversation with one-use approvals bound to the current process and full visible prompt. Changed commands, repeated submissions and changes during menu navigation are rejected.
 - Edit sent Claude messages through its native rewind. Full message labels must match exactly; ambiguous shortened labels require choosing in the terminal.
+- Clear sent command drafts before switching to Terminal, so returning to Conversation cannot restore a command that was already delivered.
 - List recent projects in New chat, pin favourite folders and filter History by project. Paired phones can select listed folders. Optional fresh-chat suggestions save a handoff and continue with the same agent and permission settings.
 - Read Codex 0.163 completed-item transcripts and follow native rewinds or `/new`. Use `--no-daemon` when supported so each terminal stays linked to its conversation. Show the active model and compact CLI/background-agent events.
 - Mobile Terminal defaults to wrapping text, with Fit and Actual modes available. Add Workspace pull-to-refresh and Android Chrome/Edge back navigation. Preserve report positions without replaying a stale restore on fragment navigation.

@@ -31,6 +31,9 @@ function savedDraft(id: string): Draft {
     return { text: typeof value.text === 'string' ? value.text : '', paths: Array.isArray(value.paths) ? value.paths.filter((item: unknown) => typeof item === 'string') : [] }
   } catch { return { text: '', paths: [] } }
 }
+function saveDraft(id: string, draft: Draft) {
+  try { localStorage.setItem(draftKey(id), JSON.stringify(draft)) } catch { /* The draft stays in memory. */ }
+}
 
 // Web and mail links open in the browser. A file: URL, a drive path or a scheme-less
 // link is a local path, possibly relative to the chat folder: files preview in
@@ -90,7 +93,7 @@ export default function Conversation({ session, connected, agentLabel, openTermi
     requestAnimationFrame(() => { input.current?.focus(); input.current?.setSelectionRange(next.caret, next.caret) })
   }
 
-  useEffect(() => { try { localStorage.setItem(draftKey(session.id), JSON.stringify(draft)) } catch { /* Draft stays in memory. */ } }, [draft, session.id])
+  useEffect(() => { saveDraft(session.id, draft) }, [draft, session.id])
   useEffect(() => {
     let stopped = false, busy = false
     const load = async () => {
@@ -182,6 +185,9 @@ export default function Conversation({ session, connected, agentLabel, openTermi
     setSending(true); setStatus('')
     try {
       await api(`/sessions/${session.id}/send`, { text, paths: draft.paths })
+      // A picker command unmounts this view immediately, before its draft effect
+      // can run. Clear the saved draft now so returning cannot resend it.
+      saveDraft(session.id, { text: '', paths: [] })
       setDraft({ text: '', paths: [] }); setCaret(0); follow.current = true; setShowJump(false)
       if (terminalCommand(commands, text)) openTerminal()
       void reload.current()
