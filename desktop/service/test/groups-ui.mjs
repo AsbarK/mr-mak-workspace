@@ -2,6 +2,7 @@
 // survives a reload, the tab right-click menu, dropping a tab on a chip and the
 // New chat group picker. Terminals are fakes; no user chats or logins are used.
 import assert from 'node:assert/strict';
+import { expect } from '@playwright/test';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -149,7 +150,7 @@ try {
   assert.equal(await page.locator('.tab-menu-rename button').textContent(), 'Save');
   await page.locator('.tab-menu-rename input').press('Enter');
   await chip('Studio').waitFor();
-  assert.deepEqual(await groupNames('Studio'), ['Director', 'Network', 'Animator']);
+  await expect.poll(() => groupNames('Studio')).toEqual(['Director', 'Network', 'Animator']);
   assert.equal(service.sessions.get('g-0').group, 'Studio');
 
   // Dragging a chip moves the whole group, and the drag does not collapse it.

@@ -74,7 +74,8 @@ service.mobile.transcripts.read = async session => ({ supported: true, activity:
   { id: 'progress', role: 'assistant', text: 'Intermediate agent progress is included.', at: '' },
   { id: 'assistant', role: 'assistant', imageRefs: [path.join(repo, 'shared-picture.png'), path.join(repo, recordingName)], text: '## Ready for review\n\nThe latest results are in your Workspace.\n\n- **Character:** proportions updated\n- **Motion:** timing checked\n- **Next step:** choose the version you prefer\n\n[Open the source](https://example.com/source)\n\n' + (session.id === ids[0] ? 'Your agent is still working on the computer.' : 'Send a follow-up whenever an idea comes to mind.'), at: new Date().toISOString() },
 ] });
-let browser, qrSource;
+let browser, qrSource, diagnosticPhone;
+const reportResponses = [];
 try {
   browser = await launchBrowser({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const recordingPage = await browser.newPage();
@@ -148,6 +149,12 @@ try {
   let reloadingPhone = false;
   const navigationCancellations = [];
   const phone = await mobileContext.newPage(); phone.setDefaultTimeout(12000);
+  diagnosticPhone = phone;
+  phone.on('response', async response => {
+    if (!response.url().endsWith('/mobile/api/reports/open')) return;
+    const value = await response.json().catch(() => ({}));
+    reportResponses.push({ status: response.status(), kind: value.kind, step: value.step, error: value.error });
+  });
   await phone.exposeFunction('testUnhandledRejection', message => errors.push(`Unhandled rejection: ${message}`));
   await phone.addInitScript(() => window.addEventListener('unhandledrejection', event => { void window.testUnhandledRejection(String(event.reason)).catch(() => {}); }));
   phone.on('pageerror', error => {
@@ -689,10 +696,16 @@ try {
 
   // Pull to refresh reloads the report only from the top, and keeps its page.
   const pullDown = (locator, distance) => locator.evaluate((node, distance) => {
-    const touches = y => [new Touch({ identifier: 1, target: node, clientX: 120, clientY: y })];
-    node.dispatchEvent(new TouchEvent('touchstart', { touches: touches(100), bubbles: true }));
-    for (let y = 110; y <= 100 + distance; y += 10) node.dispatchEvent(new TouchEvent('touchmove', { touches: touches(y), bubbles: true }));
-    node.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true }));
+    // Desktop WebKit exposes Touch but does not allow constructing it. The
+    // handlers consume touch coordinates, so use the same event data in both engines.
+    const dispatch = (type, y) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: y == null ? [] : [{ identifier: 1, target: node, clientX: 120, clientY: y }] });
+      node.dispatchEvent(event);
+    };
+    dispatch('touchstart', 100);
+    for (let y = 110; y <= 100 + distance; y += 10) dispatch('touchmove', y);
+    dispatch('touchend');
   }, distance);
   const reportIdentity = () => frame.locator('body').evaluate(() => window.testReportIdentity).catch(() => 'loading');
   await expect.poll(() => frame.locator('body').evaluate(() => window.scrollY)).toBe(500);
@@ -808,6 +821,17 @@ try {
   if (navigationCancellations.length) console.log(`Expected WebKit read cancellations during reload: ${navigationCancellations.length}`);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, fixture: repo, checks: ['Workspace context follows card/tab/page and section', 'navigation-only references; no report content or grant URLs', 'context frozen across lost reply, page change and reload', 'automatic context excluded from display and read aloud', 'cleared selection, slash commands and pre-update pending drafts', 'QR + desktop approval', 'independent views and PTY sizes', 'microphone permission / record / stop / cancel', 'dictation never auto-sends', 'saved recording recovery after reload and chat switch', 'lost transcription reply reuses provider result', 'lost reply / retry once', 'drafts per chat', 'offline recovery', 'image attachment', 'sandboxed report + image download', 'Markdown preview', 'long-link chat cards at 320/360/393/430/768px', '360/390/768px report layout', 'four terminal arrows and touch targets', 'close confirmation / desktop tab sync / History resume / draft retention', 'device revocation'] }));
+} catch (error) {
+  if (diagnosticPhone) {
+    const state = await diagnosticPhone.evaluate(() => ({
+      navigation: localStorage.getItem('mrmak.mobile.navigation'), workspace: localStorage.getItem('mrmak.mobile.workspace'),
+      report: document.querySelector('.mobile-results')?.textContent?.slice(0, 800),
+      headings: [...document.querySelectorAll('h1,h2')].map(node => node.textContent),
+    })).catch(() => null);
+    console.error(JSON.stringify({ mobileFailure: state, reportResponses }));
+    await diagnosticPhone.screenshot({ path: path.join(repo, 'failure.png') }).catch(() => {});
+  }
+  throw error;
 } finally {
   await browser?.close(); for (const session of service.sessions.items.values()) session.process = null;
   if (qrSource) { qrSource.closeAllConnections(); await new Promise(resolve => qrSource.close(resolve)); }
